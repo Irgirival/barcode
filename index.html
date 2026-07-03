@@ -704,10 +704,14 @@
     });
   }
 
+  const FIXED_JENIS = ['AC', 'Kipas'];
+
   function populateFilterOptions(){
     const jenisSel = document.getElementById('filterJenis');
     const assetSel = document.getElementById('filterAsset');
-    const jenisList = [...new Set(assets.map(a => a.jenis))];
+    const dynamicJenis = [...new Set(assets.map(a => a.jenis))];
+    const extraJenis = dynamicJenis.filter(j => !FIXED_JENIS.some(f => f.toLowerCase() === j.toLowerCase()));
+    const jenisList = [...FIXED_JENIS, ...extraJenis];
     const prevJenis = filterJenis, prevAsset = filterAsset;
     jenisSel.innerHTML = '<option value="all">Semua Jenis</option>' + jenisList.map(j => `<option value="${escapeHtml(j)}">${escapeHtml(j)}</option>`).join('');
     const assetPool = prevJenis === 'all' ? assets : assets.filter(a => a.jenis === prevJenis);
