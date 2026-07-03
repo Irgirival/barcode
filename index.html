@@ -162,6 +162,9 @@
 
   .shared-note{ font-family:var(--mono); font-size:10.5px; color: var(--ink-dim); text-align:center; margin-top:16px; line-height:1.6; }
 
+  .filter-bar{ display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+  .filter-bar select{ flex:1; min-width:100px; font-size:12.5px; padding:9px 10px; }
+
   #printArea{ display:none; }
   @media print{
     body *{ visibility:hidden; }
@@ -227,6 +230,15 @@
     <!-- SERVICE VIEW -->
     <section class="view" id="view-service">
       <div class="section-title">Riwayat Servis &amp; Perawatan <span class="count-pill" id="svcCountPill">0</span></div>
+      <div class="filter-bar">
+        <select id="filterJenis"><option value="all">Semua Jenis</option></select>
+        <select id="filterAsset"><option value="all">Semua Aset</option></select>
+        <select id="filterStatus">
+          <option value="all">Semua Status</option>
+          <option value="Selesai">Selesai</option>
+          <option value="Dalam Proses">Dalam Proses</option>
+        </select>
+      </div>
       <div id="serviceList"></div>
       <button class="btn btn-outline fab-add" id="btnAddServiceMain">+ Catat Servis Baru</button>
     </section>
@@ -243,18 +255,27 @@
   const K_SVC = 'asetscan:service';
   let assets = [];
   let serviceEntries = [];
+  let filterJenis = 'all';
+  let filterAsset = 'all';
+  let filterStatus = 'all';
   let html5QrCode = null;
   let scanning = false;
 
   const seedAssets = [
-    { barcode:'AC-0001', name:'AC Split 1PK', jenis:'AC Split', lokasi:'Ruang Server Lt.2' },
-    { barcode:'AC-0002', name:'AC Split 2PK', jenis:'AC Split', lokasi:'Ruang Meeting Lt.3' },
-    { barcode:'AC-0003', name:'AC Cassette 3PK', jenis:'AC Cassette', lokasi:'Lobby Utama Lt.1' },
-    { barcode:'AC-0004', name:'AC Split 1PK', jenis:'AC Split', lokasi:'Ruang HRD Lt.2' },
+    { barcode:'AC-0001', name:'AC Split 1PK', jenis:'AC', lokasi:'Ruang Server Lt.2' },
+    { barcode:'AC-0002', name:'AC Split 2PK', jenis:'AC', lokasi:'Ruang Meeting Lt.3' },
+    { barcode:'AC-0003', name:'AC Cassette 3PK', jenis:'AC', lokasi:'Lobby Utama Lt.1' },
+    { barcode:'AC-0004', name:'AC Split 1PK', jenis:'AC', lokasi:'Ruang HRD Lt.2' },
+    { barcode:'AC-0005', name:'AC Split 1.5PK', jenis:'AC', lokasi:'Ruang Direktur Lt.4' },
+    { barcode:'KP-0001', name:'Kipas Angin Berdiri', jenis:'Kipas', lokasi:'Ruang Produksi Lt.1' },
+    { barcode:'KP-0002', name:'Kipas Angin Dinding', jenis:'Kipas', lokasi:'Gudang Belakang' },
+    { barcode:'KP-0003', name:'Kipas Angin Berdiri', jenis:'Kipas', lokasi:'Ruang Meeting Lt.3' },
+    { barcode:'KP-0004', name:'Kipas Exhaust', jenis:'Kipas', lokasi:'Dapur Kantin' },
   ];
   const seedService = [
     { id:'seed1', barcode:'AC-0001', itemName:'AC Split 1PK', svcType:'Servis Rutin', technician:'Budi (Teknisi Internal)', description:'Cleaning unit indoor & outdoor, cek tekanan freon normal', status:'Selesai', ts:new Date(Date.now()-1000*60*60*24*30).toISOString() },
     { id:'seed2', barcode:'AC-0003', itemName:'AC Cassette 3PK', svcType:'Perbaikan', technician:'CV Sejuk Abadi', description:'Ganti kapasitor kompresor, unit sempat mati total', status:'Selesai', ts:new Date(Date.now()-1000*60*60*24*10).toISOString() },
+    { id:'seed3', barcode:'KP-0001', itemName:'Kipas Angin Berdiri', svcType:'Cleaning Indoor', technician:'Budi (Teknisi Internal)', description:'Bersihkan baling-baling dan kisi-kisi dari debu', status:'Selesai', ts:new Date(Date.now()-1000*60*60*24*5).toISOString() },
   ];
 
   function toast(msg, isErr){
@@ -644,12 +665,45 @@
     });
   }
 
+  function populateFilterOptions(){
+    const jenisSel = document.getElementById('filterJenis');
+    const assetSel = document.getElementById('filterAsset');
+    const jenisList = [...new Set(assets.map(a => a.jenis))];
+    const prevJenis = filterJenis, prevAsset = filterAsset;
+    jenisSel.innerHTML = '<option value="all">Semua Jenis</option>' + jenisList.map(j => `<option value="${escapeHtml(j)}">${escapeHtml(j)}</option>`).join('');
+    const assetPool = prevJenis === 'all' ? assets : assets.filter(a => a.jenis === prevJenis);
+    assetSel.innerHTML = '<option value="all">Semua Aset</option>' + assetPool.map(a => `<option value="${escapeHtml(a.barcode)}">${escapeHtml(a.name)} · ${escapeHtml(a.barcode)}</option>`).join('');
+    jenisSel.value = jenisList.includes(prevJenis) || prevJenis === 'all' ? prevJenis : 'all';
+    assetSel.value = assetPool.some(a => a.barcode === prevAsset) ? prevAsset : 'all';
+  }
+
+  document.getElementById('filterJenis').addEventListener('change', (e)=>{
+    filterJenis = e.target.value; filterAsset = 'all';
+    populateFilterOptions(); renderServiceList();
+  });
+  document.getElementById('filterAsset').addEventListener('change', (e)=>{
+    filterAsset = e.target.value; renderServiceList();
+  });
+  document.getElementById('filterStatus').addEventListener('change', (e)=>{
+    filterStatus = e.target.value; renderServiceList();
+  });
+
   // SERVICE TAB
   function renderServiceList(){
+    populateFilterOptions();
     const list = document.getElementById('serviceList');
-    document.getElementById('svcCountPill').textContent = serviceEntries.length;
-    if(serviceEntries.length === 0){ list.innerHTML = emptyState('Belum ada riwayat servis / perawatan'); return; }
-    const sorted = serviceEntries.slice().sort((a,b)=> new Date(b.ts)-new Date(a.ts));
+    let sorted = serviceEntries.slice().sort((a,b)=> new Date(b.ts)-new Date(a.ts));
+    if(filterAsset !== 'all'){
+      sorted = sorted.filter(r => r.barcode === filterAsset);
+    } else if(filterJenis !== 'all'){
+      const barcodesOfJenis = new Set(assets.filter(a => a.jenis === filterJenis).map(a => a.barcode));
+      sorted = sorted.filter(r => barcodesOfJenis.has(r.barcode));
+    }
+    if(filterStatus !== 'all'){
+      sorted = sorted.filter(r => r.status === filterStatus);
+    }
+    document.getElementById('svcCountPill').textContent = sorted.length + (sorted.length !== serviceEntries.length ? ' / ' + serviceEntries.length : '');
+    if(sorted.length === 0){ list.innerHTML = emptyState(serviceEntries.length === 0 ? 'Belum ada riwayat servis / perawatan' : 'Tidak ada riwayat yang cocok dengan filter'); return; }
     list.innerHTML = sorted.map(r => {
       const asset = assets.find(a => a.barcode === r.barcode);
       const d = new Date(r.ts);
