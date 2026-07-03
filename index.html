@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ScanKeluar — Sistem Pemindai Barang</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/JsBarcode/3.11.5/JsBarcode.all.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&family=Barlow:wght@400;500;600&display=swap');
 
@@ -202,6 +203,50 @@
   .shared-note{
     font-family:var(--mono); font-size:10.5px; color: var(--ink-dim); text-align:center; margin-top:16px; line-height:1.6;
   }
+
+  .item-card{ align-items:center; }
+  .item-right{ display:flex; align-items:center; gap:12px; }
+  .btn-print{
+    background:none; border:1.5px solid #d9d5c8; color:var(--ink-dim); border-radius:6px;
+    padding:7px 9px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  }
+  .btn-print:hover{ border-color: var(--amber); color: var(--amber); }
+  .btn-print svg{ width:16px; height:16px; }
+
+  .code-input-row{ display:flex; gap:8px; }
+  .code-input-row input{ flex:1; }
+  .btn-gen{
+    background: var(--bg-raised); border:1px solid var(--line); color:var(--card);
+    font-family:var(--mono); font-size:11px; padding:0 12px; border-radius:7px; cursor:pointer; white-space:nowrap;
+  }
+  .btn-gen:hover{ border-color: var(--amber); color: var(--amber); }
+
+  .barcode-preview{
+    background:#fff; border-radius:8px; padding:16px 10px; text-align:center; margin-top:14px;
+    border:1px solid #e4e0d3;
+  }
+  .barcode-preview svg{ max-width:100%; }
+  .barcode-preview .bp-name{ font-family:var(--sans); font-weight:700; font-size:14px; color:#17181c; margin-top:2px; }
+
+  #printArea{ display:none; }
+  @media print{
+    body *{ visibility:hidden; }
+    #printArea, #printArea *{ visibility:visible; }
+    #printArea{
+      display:block; position:absolute; top:0; left:0; width:100%;
+      background:#fff;
+    }
+    .label-grid{
+      display:grid; grid-template-columns:repeat(2, 1fr); gap:10px; padding:10px;
+    }
+    .label-tile{
+      border:1px dashed #999; border-radius:4px; padding:10px 8px; text-align:center;
+      break-inside: avoid;
+    }
+    .label-tile svg{ max-width:100%; }
+    .label-tile .lt-name{ font-family:sans-serif; font-weight:700; font-size:13px; color:#000; margin-top:2px; }
+    .label-tile .lt-code{ font-family:monospace; font-size:10px; color:#333; }
+  }
 </style>
 </head>
 <body>
@@ -267,6 +312,8 @@
 </div>
 
 <div class="toast" id="toast"></div>
+
+<div id="printArea"><div class="label-grid" id="labelGrid"></div></div>
 
 <script>
 (function(){
@@ -380,7 +427,7 @@
     if(item){
       openScanModal(item);
     } else {
-      openNewItemModal(code);
+      openNewItemModal(code, true);
     }
   }
 
@@ -454,13 +501,18 @@
     });
   }
 
-  function openNewItemModal(code){
+  function generateInternalCode(){
+    const rand = Math.floor(1000 + Math.random()*9000);
+    return 'INT' + Date.now().toString(36).toUpperCase().slice(-5) + rand;
+  }
+
+  function openNewItemModal(code, fromScan){
+    const isManualEntry = !fromScan;
     modalContent.innerHTML = `
       <div class="modal-head">
         <div class="modal-title">Barang Belum Terdaftar</div>
         <button class="modal-close" id="mClose">&times;</button>
       </div>
-      <div class="item-barcode">Kode: ${escapeHtml(code)}</div>
       <label>Nama Barang</label>
       <input type="text" id="nName" placeholder="Contoh: Kabel LAN 5m">
       <label>Kategori</label>
@@ -469,6 +521,12 @@
       <input type="number" id="nStock" min="0" value="1">
       <label>Satuan</label>
       <input type="text" id="nUnit" placeholder="pcs / unit / set" value="pcs">
+      <label>Kode Barcode</label>
+      <div class="code-input-row">
+        <input type="text" id="nCode" value="${escapeHtml(code)}" ${fromScan ? 'readonly' : ''}>
+        ${isManualEntry ? '<button type="button" class="btn-gen" id="nGenCode">Generate</button>' : ''}
+      </div>
+      <div class="stock-hint">${fromScan ? 'Kode ini terbaca dari hasil scan kamera.' : 'Kosongkan lalu klik Generate untuk buat kode internal otomatis, atau isi manual kalau barang sudah punya barcode pabrik.'}</div>
       <div class="modal-actions">
         <button class="btn btn-amber" id="nSubmit">Simpan Barang</button>
         <button class="btn btn-outline" id="mCancel">Batal</button>
@@ -477,23 +535,78 @@
     overlay.classList.add('active');
     document.getElementById('mClose').addEventListener('click', closeModal);
     document.getElementById('mCancel').addEventListener('click', closeModal);
+    const genBtn = document.getElementById('nGenCode');
+    if(genBtn){
+      genBtn.addEventListener('click', ()=>{ document.getElementById('nCode').value = generateInternalCode(); });
+    }
     document.getElementById('nSubmit').addEventListener('click', async ()=>{
       const name = document.getElementById('nName').value.trim();
       const category = document.getElementById('nCategory').value.trim() || 'Umum';
       const stock = parseInt(document.getElementById('nStock').value, 10) || 0;
       const unit = document.getElementById('nUnit').value.trim() || 'pcs';
+      let finalCode = document.getElementById('nCode').value.trim();
       if(!name){ toast('Isi nama barang dulu', true); return; }
-      inventory.push({ barcode: code, name, category, stock, unit });
+      if(!finalCode) finalCode = generateInternalCode();
+      if(inventory.some(i => i.barcode === finalCode)){ toast('Kode barcode sudah dipakai barang lain', true); return; }
+      const newItem = { barcode: finalCode, name, category, stock, unit };
+      inventory.push(newItem);
       await saveInventory();
       renderInventory();
       closeModal();
       toast('Barang baru ditambahkan: ' + name);
+      openPrintModal(newItem);
     });
   }
 
+  function openPrintModal(item){
+    modalContent.innerHTML = `
+      <div class="modal-head">
+        <div class="modal-title">Cetak Label Barcode</div>
+        <button class="modal-close" id="mClose">&times;</button>
+      </div>
+      <div class="item-barcode">${escapeHtml(item.name)} · ${escapeHtml(item.category)}</div>
+      <div class="barcode-preview">
+        <svg id="bcSvgPreview"></svg>
+        <div class="bp-name">${escapeHtml(item.name)}</div>
+      </div>
+      <label>Jumlah Label Dicetak</label>
+      <input type="number" id="pQty" min="1" value="1">
+      <div class="stock-hint">Cetak beberapa label sekaligus kalau mau tempel di banyak unit barang yang sama.</div>
+      <div class="modal-actions">
+        <button class="btn btn-amber" id="pPrint">Cetak Sekarang</button>
+        <button class="btn btn-outline" id="mCancel">Tutup</button>
+      </div>
+    `;
+    overlay.classList.add('active');
+    document.getElementById('mClose').addEventListener('click', closeModal);
+    document.getElementById('mCancel').addEventListener('click', closeModal);
+    try{
+      JsBarcode("#bcSvgPreview", item.barcode, { format:"CODE128", width:2, height:55, fontSize:12, margin:6 });
+    }catch(e){}
+    document.getElementById('pPrint').addEventListener('click', ()=>{
+      const qty = parseInt(document.getElementById('pQty').value, 10) || 1;
+      printLabels(item, qty);
+    });
+  }
+
+  function printLabels(item, qty){
+    const grid = document.getElementById('labelGrid');
+    grid.innerHTML = '';
+    for(let i=0; i<qty; i++){
+      const tile = document.createElement('div');
+      tile.className = 'label-tile';
+      const svgId = 'lbl-svg-' + i;
+      tile.innerHTML = `<svg id="${svgId}"></svg><div class="lt-name">${escapeHtml(item.name)}</div><div class="lt-code">${escapeHtml(item.barcode)}</div>`;
+      grid.appendChild(tile);
+    }
+    for(let i=0; i<qty; i++){
+      try{ JsBarcode('#lbl-svg-' + i, item.barcode, { format:"CODE128", width:2, height:50, fontSize:11, margin:4 }); }catch(e){}
+    }
+    setTimeout(()=>{ window.print(); }, 150);
+  }
+
   document.getElementById('btnAddItem').addEventListener('click', ()=>{
-    const code = 'MANUAL-' + Date.now().toString(36).toUpperCase();
-    openNewItemModal(code);
+    openNewItemModal(generateInternalCode(), false);
   });
 
   // ---------- RENDER ----------
@@ -505,7 +618,7 @@
       list.innerHTML = emptyState('Belum ada barang terdaftar');
       return;
     }
-    list.innerHTML = inventory.map(item => {
+    list.innerHTML = inventory.map((item, idx) => {
       const low = item.stock <= 2;
       return `
       <div class="item-card ${low?'low':''}">
@@ -513,12 +626,20 @@
           <div class="item-name">${escapeHtml(item.name)}</div>
           <div class="item-barcode">${escapeHtml(item.barcode)} · ${escapeHtml(item.category)}</div>
         </div>
-        <div class="item-stock">
-          <div class="stock-num ${low?'low':''}">${item.stock}</div>
-          <div class="stock-unit">${escapeHtml(item.unit)}</div>
+        <div class="item-right">
+          <button class="btn-print" data-idx="${idx}" title="Cetak label barcode">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 9V3h12v6M6 18H4a1 1 0 01-1-1v-5a1 1 0 011-1h16a1 1 0 011 1v5a1 1 0 01-1 1h-2M6 14h12v7H6z"/></svg>
+          </button>
+          <div class="item-stock">
+            <div class="stock-num ${low?'low':''}">${item.stock}</div>
+            <div class="stock-unit">${escapeHtml(item.unit)}</div>
+          </div>
         </div>
       </div>`;
     }).join('');
+    list.querySelectorAll('.btn-print').forEach(btn=>{
+      btn.addEventListener('click', ()=> openPrintModal(inventory[parseInt(btn.dataset.idx,10)]));
+    });
   }
 
   function renderHistory(){
