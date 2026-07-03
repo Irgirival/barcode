@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ScanKeluar — Sistem Pemindai Barang</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&family=Barlow:wght@400;500;600&display=swap');
+
+  :root{
+    --bg: #16181d;
+    --bg-raised: #1f2229;
+    --card: #f6f4ee;
+    --card-dim: #eae7dd;
+    --ink: #17181c;
+    --ink-dim: #6b6f76;
+    --line: #33363f;
+    --amber: #ff8a1e;
+    --amber-dim: #7a4a17;
+    --green: #48b96b;
+    --red: #e05c4c;
+    --mono: 'IBM Plex Mono', monospace;
+    --cond: 'Barlow Condensed', sans-serif;
+    --sans: 'Barlow', sans-serif;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background: var(--bg);
+    color: var(--card);
+    font-family: var(--sans);
+    min-height:100vh;
+    background-image:
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.025) 0px, rgba(255,255,255,0.025) 2px, transparent 2px, transparent 14px);
+  }
+  .app{ max-width: 640px; margin:0 auto; min-height:100vh; display:flex; flex-direction:column; }
+
+  header.top{
+    padding: 22px 20px 16px;
+    border-bottom: 1px solid var(--line);
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .brand{ display:flex; align-items:center; gap:10px; }
+  .brand-mark{
+    width:34px; height:34px; border-radius:6px;
+    background: var(--amber);
+    display:flex; align-items:center; justify-content:center;
+    color:#16181d; font-family: var(--mono); font-weight:700; font-size:15px;
+  }
+  .brand-name{ font-family: var(--cond); font-weight:800; font-size:22px; letter-spacing:0.5px; }
+  .brand-sub{ font-family: var(--mono); font-size:10px; color: var(--ink-dim); letter-spacing:1.5px; text-transform:uppercase; }
+
+  nav.tabs{
+    display:flex; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--bg); z-index:10;
+  }
+  .tab{
+    flex:1; text-align:center; padding:13px 8px; font-family:var(--cond); font-weight:700;
+    font-size:16px; letter-spacing:0.5px; color:var(--ink-dim); cursor:pointer;
+    border-bottom:3px solid transparent; transition: all .15s;
+    background:none; border-top:none; border-left:none; border-right:none;
+  }
+  .tab.active{ color: var(--amber); border-bottom-color: var(--amber); }
+  .tab:hover:not(.active){ color: var(--card); }
+
+  main{ flex:1; padding: 20px 18px 60px; }
+  .view{ display:none; }
+  .view.active{ display:block; animation: fadein .25s ease; }
+  @keyframes fadein{ from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);} }
+
+  /* SCAN VIEW */
+  .scan-frame{
+    position:relative; background:var(--bg-raised); border:1px solid var(--line); border-radius:10px;
+    aspect-ratio: 1/1; max-height: 340px; overflow:hidden; display:flex; align-items:center; justify-content:center;
+  }
+  #reader{ width:100%; }
+  .scan-placeholder{ text-align:center; color:var(--ink-dim); padding:20px; }
+  .scan-placeholder svg{ width:52px; height:52px; margin-bottom:10px; opacity:.6; }
+  .corner{ position:absolute; width:26px; height:26px; border-color: var(--amber); pointer-events:none; z-index:5; }
+  .c-tl{ top:10px; left:10px; border-top:3px solid; border-left:3px solid; }
+  .c-tr{ top:10px; right:10px; border-top:3px solid; border-right:3px solid; }
+  .c-bl{ bottom:10px; left:10px; border-bottom:3px solid; border-left:3px solid; }
+  .c-br{ bottom:10px; right:10px; border-bottom:3px solid; border-right:3px solid; }
+
+  .btn{
+    font-family: var(--cond); font-weight:700; font-size:17px; letter-spacing:0.4px;
+    padding:13px 20px; border-radius:7px; border:none; cursor:pointer; width:100%;
+    transition: transform .1s, opacity .15s;
+  }
+  .btn:active{ transform: scale(0.98); }
+  .btn-amber{ background: var(--amber); color:#17181c; }
+  .btn-amber:hover{ opacity:.92; }
+  .btn-outline{ background:transparent; color:var(--card); border:1.5px solid var(--line); }
+  .btn-outline:hover{ border-color: var(--amber); color:var(--amber); }
+  .btn-green{ background: var(--green); color:#0d1f13; }
+  .btn-red{ background: var(--red); color:#2a0e0a; }
+  .btn-sm{ padding:9px 14px; font-size:14px; width:auto; }
+
+  .scan-actions{ margin-top:14px; display:flex; flex-direction:column; gap:10px; }
+
+  .manual-row{ display:flex; gap:8px; margin-top:14px; }
+  .manual-row input{ flex:1; }
+
+  input, select{
+    background: var(--bg-raised); border:1px solid var(--line); color:var(--card);
+    padding:11px 12px; border-radius:7px; font-family:var(--sans); font-size:14px; width:100%;
+    outline:none;
+  }
+  input:focus, select:focus{ border-color: var(--amber); }
+  input::placeholder{ color: var(--ink-dim); }
+  label{ font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--ink-dim); display:block; margin-bottom:5px; margin-top:12px; }
+  label:first-child{ margin-top:0; }
+
+  .section-title{ font-family:var(--cond); font-weight:800; font-size:20px; margin-bottom:14px; display:flex; align-items:center; justify-content:space-between; }
+  .count-pill{ font-family:var(--mono); font-size:11px; background:var(--bg-raised); border:1px solid var(--line); padding:3px 9px; border-radius:20px; color:var(--ink-dim); }
+
+  /* INVENTORY LIST */
+  .item-card{
+    background: var(--card); color: var(--ink); border-radius:9px; padding:14px 14px;
+    margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; gap:10px;
+    border-left: 4px solid var(--amber);
+  }
+  .item-card.low{ border-left-color: var(--red); }
+  .item-name{ font-weight:600; font-size:15.5px; }
+  .item-barcode{ font-family:var(--mono); font-size:11px; color:var(--ink-dim); margin-top:2px; letter-spacing:0.5px; }
+  .item-stock{ text-align:right; }
+  .stock-num{ font-family:var(--mono); font-weight:700; font-size:20px; }
+  .stock-num.low{ color: var(--red); }
+  .stock-unit{ font-size:10.5px; color:var(--ink-dim); text-transform:uppercase; letter-spacing:0.5px; }
+
+  .fab-add{
+    display:flex; align-items:center; justify-content:center; gap:6px;
+    margin-top:6px;
+  }
+
+  /* HISTORY / TICKET LOG */
+  .ticket{
+    background: var(--card); color: var(--ink); border-radius:8px; padding:0; margin-bottom:12px;
+    position:relative; overflow:hidden;
+    box-shadow: 0 2px 0 rgba(0,0,0,0.15);
+  }
+  .ticket-top{ padding:13px 14px 10px; }
+  .ticket-action{
+    display:inline-block; font-family:var(--mono); font-size:10.5px; font-weight:700; letter-spacing:1px;
+    text-transform:uppercase; padding:3px 8px; border-radius:4px; margin-bottom:7px;
+  }
+  .ticket-action.ambil{ background:#fde3c8; color:#8a4a10; }
+  .ticket-action.kembali{ background:#d7f0dd; color:#1f6b38; }
+  .ticket-item{ font-weight:700; font-size:16px; }
+  .ticket-meta{ font-family:var(--mono); font-size:12px; color:var(--ink-dim); margin-top:4px; }
+  .ticket-perf{
+    border-top: 1px dashed #c9c5b8; padding:9px 14px; display:flex; justify-content:space-between;
+    font-family:var(--mono); font-size:11.5px; color:var(--ink-dim);
+  }
+  .ticket-perf b{ color:var(--ink); font-weight:600; }
+  .perf-strip{
+    position:absolute; left:0; top:0; bottom:0; width:5px;
+  }
+  .perf-strip.ambil{ background: var(--amber); }
+  .perf-strip.kembali{ background: var(--green); }
+
+  .empty{ text-align:center; padding:50px 20px; color:var(--ink-dim); }
+  .empty svg{ width:44px; height:44px; margin-bottom:12px; opacity:.4; }
+  .empty p{ font-family:var(--mono); font-size:12.5px; }
+
+  /* MODAL */
+  .overlay{
+    position:fixed; inset:0; background:rgba(10,11,13,0.72); z-index:100;
+    display:none; align-items:flex-end; justify-content:center;
+  }
+  .overlay.active{ display:flex; }
+  .modal{
+    background: var(--card); color:var(--ink); width:100%; max-width:640px;
+    border-radius:16px 16px 0 0; padding:22px 20px 26px; max-height:88vh; overflow-y:auto;
+    animation: slideup .22s ease;
+  }
+  @keyframes slideup{ from{ transform:translateY(30px); opacity:0; } to{ transform:translateY(0); opacity:1; } }
+  .modal-head{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:4px; }
+  .modal-title{ font-family:var(--cond); font-weight:800; font-size:22px; }
+  .modal-close{ background:none; border:none; font-size:22px; color:var(--ink-dim); cursor:pointer; line-height:1; padding:4px; }
+  .modal .item-barcode{ margin-bottom:14px; }
+  .modal label{ color:var(--ink-dim); }
+  .modal input, .modal select{ background:#fff; color:var(--ink); border:1px solid #d9d5c8; }
+  .action-toggle{ display:flex; gap:8px; margin-top:6px; }
+  .action-toggle button{
+    flex:1; padding:11px; border-radius:7px; border:1.5px solid #d9d5c8; background:#fff; color:var(--ink);
+    font-family:var(--cond); font-weight:700; font-size:15px; cursor:pointer;
+  }
+  .action-toggle button.selected.ambil{ background:var(--amber); border-color:var(--amber); color:#17181c; }
+  .action-toggle button.selected.kembali{ background:var(--green); border-color:var(--green); color:#0d1f13; }
+  .modal-actions{ margin-top:20px; display:flex; flex-direction:column; gap:10px; }
+  .stock-hint{ font-family:var(--mono); font-size:12px; color:var(--ink-dim); margin-top:5px; }
+
+  .toast{
+    position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(100px);
+    background: var(--green); color:#0d1f13; padding:12px 22px; border-radius:8px;
+    font-family:var(--cond); font-weight:700; font-size:15px; z-index:200; transition: transform .3s ease;
+    box-shadow: 0 6px 20px rgba(0,0,0,.3);
+  }
+  .toast.show{ transform:translateX(-50%) translateY(0); }
+  .toast.err{ background: var(--red); color:#2a0e0a; }
+
+  .shared-note{
+    font-family:var(--mono); font-size:10.5px; color: var(--ink-dim); text-align:center; margin-top:16px; line-height:1.6;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <div class="brand-mark">▮▯▮</div>
+      <div>
+        <div class="brand-name">ScanKeluar</div>
+        <div class="brand-sub">Log Ambil / Kembali Barang</div>
+      </div>
+    </div>
+    <span class="count-pill" id="itemCountPill">0 barang</span>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-view="scan">Scan</button>
+    <button class="tab" data-view="inventory">Inventaris</button>
+    <button class="tab" data-view="history">Riwayat</button>
+  </nav>
+
+  <main>
+    <!-- SCAN VIEW -->
+    <section class="view active" id="view-scan">
+      <div class="scan-frame" id="scanFrame">
+        <div class="corner c-tl"></div><div class="corner c-tr"></div>
+        <div class="corner c-bl"></div><div class="corner c-br"></div>
+        <div id="reader"></div>
+        <div class="scan-placeholder" id="scanPlaceholder">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v7M14 20h4"/></svg>
+          <div>Kamera belum aktif</div>
+        </div>
+      </div>
+      <div class="scan-actions">
+        <button class="btn btn-amber" id="btnStartScan">Mulai Scan Barcode</button>
+        <button class="btn btn-outline" id="btnStopScan" style="display:none;">Hentikan Kamera</button>
+      </div>
+      <div class="manual-row">
+        <input type="text" id="manualBarcode" placeholder="atau ketik kode barcode manual…">
+        <button class="btn btn-outline btn-sm" id="btnManualGo">Cari</button>
+      </div>
+      <p class="shared-note">Kamera memindai barcode/QR barang. Data barang &amp; riwayat scan tersimpan dan terlihat oleh semua pengguna aplikasi ini.</p>
+    </section>
+
+    <!-- INVENTORY VIEW -->
+    <section class="view" id="view-inventory">
+      <div class="section-title">Daftar Barang <span class="count-pill" id="invCountPill">0</span></div>
+      <div id="inventoryList"></div>
+      <button class="btn btn-outline fab-add" id="btnAddItem">+ Tambah Barang Baru</button>
+    </section>
+
+    <!-- HISTORY VIEW -->
+    <section class="view" id="view-history">
+      <div class="section-title">Riwayat Scan <span class="count-pill" id="histCountPill">0</span></div>
+      <div id="historyList"></div>
+    </section>
+  </main>
+</div>
+
+<!-- MODAL: scan result / action -->
+<div class="overlay" id="modalOverlay">
+  <div class="modal" id="modalContent"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  const K_INV = 'scankeluar:inventory';
+  const K_LOG = 'scankeluar:log';
+  let inventory = [];
+  let logEntries = [];
+  let html5QrCode = null;
+  let scanning = false;
+
+  const seedInventory = [
+    { barcode:'8991002123456', name:'Laptop Dell Latitude', category:'Elektronik', stock:8, unit:'unit' },
+    { barcode:'8991002123457', name:'Proyektor Epson', category:'Elektronik', stock:2, unit:'unit' },
+    { barcode:'8991002123458', name:'Kabel HDMI 2m', category:'Aksesoris', stock:15, unit:'pcs' },
+    { barcode:'8991002123459', name:'Helm Safety', category:'APD', stock:3, unit:'pcs' },
+    { barcode:'8991002123460', name:'Toolkit Obeng Set', category:'Peralatan', stock:5, unit:'set' },
+  ];
+
+  function toast(msg, isErr){
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast show' + (isErr ? ' err' : '');
+    setTimeout(()=> t.classList.remove('show'), 2400);
+  }
+
+  async function loadData(){
+    try{
+      const invRes = await window.storage.get(K_INV, true);
+      inventory = invRes ? JSON.parse(invRes.value) : null;
+    }catch(e){ inventory = null; }
+    if(!inventory){
+      inventory = seedInventory;
+      await saveInventory();
+    }
+    try{
+      const logRes = await window.storage.get(K_LOG, true);
+      logEntries = logRes ? JSON.parse(logRes.value) : [];
+    }catch(e){ logEntries = []; }
+    renderInventory();
+    renderHistory();
+  }
+
+  async function saveInventory(){
+    try{ await window.storage.set(K_INV, JSON.stringify(inventory), true); }
+    catch(e){ toast('Gagal menyimpan data barang', true); }
+  }
+  async function saveLog(){
+    try{ await window.storage.set(K_LOG, JSON.stringify(logEntries), true); }
+    catch(e){ toast('Gagal menyimpan riwayat', true); }
+  }
+
+  // ---------- TABS ----------
+  document.querySelectorAll('.tab').forEach(tab=>{
+    tab.addEventListener('click', ()=>{
+      document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+      document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('view-'+tab.dataset.view).classList.add('active');
+      if(tab.dataset.view !== 'scan' && scanning) stopScan();
+    });
+  });
+
+  // ---------- SCANNING ----------
+  document.getElementById('btnStartScan').addEventListener('click', startScan);
+  document.getElementById('btnStopScan').addEventListener('click', stopScan);
+
+  function startScan(){
+    document.getElementById('scanPlaceholder').style.display = 'none';
+    document.getElementById('btnStartScan').style.display = 'none';
+    document.getElementById('btnStopScan').style.display = 'block';
+    html5QrCode = new Html5Qrcode("reader");
+    const config = { fps: 10, qrbox: { width: 220, height: 220 } };
+    html5QrCode.start(
+      { facingMode: "environment" },
+      config,
+      (decodedText)=>{ onBarcodeDetected(decodedText); },
+      ()=>{}
+    ).then(()=>{ scanning = true; })
+    .catch(err=>{
+      toast('Tidak bisa akses kamera. Cek izin kamera browser.', true);
+      resetScanUI();
+    });
+  }
+
+  function stopScan(){
+    if(html5QrCode && scanning){
+      html5QrCode.stop().then(()=>{ html5QrCode.clear(); resetScanUI(); }).catch(()=>resetScanUI());
+    } else {
+      resetScanUI();
+    }
+  }
+
+  function resetScanUI(){
+    scanning = false;
+    document.getElementById('scanPlaceholder').style.display = 'block';
+    document.getElementById('btnStartScan').style.display = 'block';
+    document.getElementById('btnStopScan').style.display = 'none';
+  }
+
+  document.getElementById('btnManualGo').addEventListener('click', ()=>{
+    const val = document.getElementById('manualBarcode').value.trim();
+    if(val) onBarcodeDetected(val);
+  });
+  document.getElementById('manualBarcode').addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter') document.getElementById('btnManualGo').click();
+  });
+
+  function onBarcodeDetected(code){
+    if(scanning) stopScan();
+    const item = inventory.find(i => i.barcode === code);
+    if(item){
+      openScanModal(item);
+    } else {
+      openNewItemModal(code);
+    }
+  }
+
+  // ---------- MODALS ----------
+  const overlay = document.getElementById('modalOverlay');
+  const modalContent = document.getElementById('modalContent');
+
+  function closeModal(){ overlay.classList.remove('active'); modalContent.innerHTML=''; }
+  overlay.addEventListener('click', (e)=>{ if(e.target === overlay) closeModal(); });
+
+  function openScanModal(item){
+    let selectedAction = 'ambil';
+    modalContent.innerHTML = `
+      <div class="modal-head">
+        <div>
+          <div class="modal-title">${escapeHtml(item.name)}</div>
+        </div>
+        <button class="modal-close" id="mClose">&times;</button>
+      </div>
+      <div class="item-barcode">${escapeHtml(item.barcode)} · ${escapeHtml(item.category)}</div>
+      <div class="stock-hint">Stok saat ini: <b>${item.stock} ${escapeHtml(item.unit)}</b></div>
+
+      <label>Aksi</label>
+      <div class="action-toggle">
+        <button type="button" class="selected ambil" data-act="ambil">Ambil Barang</button>
+        <button type="button" data-act="kembali">Kembalikan</button>
+      </div>
+
+      <label>Nama Karyawan</label>
+      <input type="text" id="mEmployee" placeholder="Nama lengkap">
+
+      <label>Jumlah</label>
+      <input type="number" id="mQty" min="1" value="1">
+
+      <div class="modal-actions">
+        <button class="btn btn-amber" id="mSubmit">Catat Transaksi</button>
+        <button class="btn btn-outline" id="mCancel">Batal</button>
+      </div>
+    `;
+    overlay.classList.add('active');
+    document.getElementById('mClose').addEventListener('click', closeModal);
+    document.getElementById('mCancel').addEventListener('click', closeModal);
+    modalContent.querySelectorAll('.action-toggle button').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        selectedAction = btn.dataset.act;
+        modalContent.querySelectorAll('.action-toggle button').forEach(b=>b.classList.remove('selected','ambil','kembali'));
+        btn.classList.add('selected', selectedAction);
+      });
+    });
+    document.getElementById('mSubmit').addEventListener('click', async ()=>{
+      const employee = document.getElementById('mEmployee').value.trim();
+      const qty = parseInt(document.getElementById('mQty').value, 10) || 1;
+      if(!employee){ toast('Isi nama karyawan dulu ya', true); return; }
+      if(selectedAction === 'ambil' && qty > item.stock){
+        toast('Stok tidak cukup (' + item.stock + ' ' + item.unit + ')', true); return;
+      }
+      if(selectedAction === 'ambil') item.stock -= qty; else item.stock += qty;
+      await saveInventory();
+      logEntries.unshift({
+        id: Date.now().toString(36),
+        barcode: item.barcode,
+        itemName: item.name,
+        unit: item.unit,
+        employee, qty, action: selectedAction,
+        ts: new Date().toISOString()
+      });
+      await saveLog();
+      renderInventory(); renderHistory();
+      closeModal();
+      toast((selectedAction === 'ambil' ? 'Barang diambil: ' : 'Barang dikembalikan: ') + item.name);
+    });
+  }
+
+  function openNewItemModal(code){
+    modalContent.innerHTML = `
+      <div class="modal-head">
+        <div class="modal-title">Barang Belum Terdaftar</div>
+        <button class="modal-close" id="mClose">&times;</button>
+      </div>
+      <div class="item-barcode">Kode: ${escapeHtml(code)}</div>
+      <label>Nama Barang</label>
+      <input type="text" id="nName" placeholder="Contoh: Kabel LAN 5m">
+      <label>Kategori</label>
+      <input type="text" id="nCategory" placeholder="Contoh: Aksesoris">
+      <label>Stok Awal</label>
+      <input type="number" id="nStock" min="0" value="1">
+      <label>Satuan</label>
+      <input type="text" id="nUnit" placeholder="pcs / unit / set" value="pcs">
+      <div class="modal-actions">
+        <button class="btn btn-amber" id="nSubmit">Simpan Barang</button>
+        <button class="btn btn-outline" id="mCancel">Batal</button>
+      </div>
+    `;
+    overlay.classList.add('active');
+    document.getElementById('mClose').addEventListener('click', closeModal);
+    document.getElementById('mCancel').addEventListener('click', closeModal);
+    document.getElementById('nSubmit').addEventListener('click', async ()=>{
+      const name = document.getElementById('nName').value.trim();
+      const category = document.getElementById('nCategory').value.trim() || 'Umum';
+      const stock = parseInt(document.getElementById('nStock').value, 10) || 0;
+      const unit = document.getElementById('nUnit').value.trim() || 'pcs';
+      if(!name){ toast('Isi nama barang dulu', true); return; }
+      inventory.push({ barcode: code, name, category, stock, unit });
+      await saveInventory();
+      renderInventory();
+      closeModal();
+      toast('Barang baru ditambahkan: ' + name);
+    });
+  }
+
+  document.getElementById('btnAddItem').addEventListener('click', ()=>{
+    const code = 'MANUAL-' + Date.now().toString(36).toUpperCase();
+    openNewItemModal(code);
+  });
+
+  // ---------- RENDER ----------
+  function renderInventory(){
+    const list = document.getElementById('inventoryList');
+    document.getElementById('itemCountPill').textContent = inventory.length + ' barang';
+    document.getElementById('invCountPill').textContent = inventory.length;
+    if(inventory.length === 0){
+      list.innerHTML = emptyState('Belum ada barang terdaftar');
+      return;
+    }
+    list.innerHTML = inventory.map(item => {
+      const low = item.stock <= 2;
+      return `
+      <div class="item-card ${low?'low':''}">
+        <div>
+          <div class="item-name">${escapeHtml(item.name)}</div>
+          <div class="item-barcode">${escapeHtml(item.barcode)} · ${escapeHtml(item.category)}</div>
+        </div>
+        <div class="item-stock">
+          <div class="stock-num ${low?'low':''}">${item.stock}</div>
+          <div class="stock-unit">${escapeHtml(item.unit)}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function renderHistory(){
+    const list = document.getElementById('historyList');
+    document.getElementById('histCountPill').textContent = logEntries.length;
+    if(logEntries.length === 0){
+      list.innerHTML = emptyState('Belum ada riwayat scan');
+      return;
+    }
+    list.innerHTML = logEntries.map(e => {
+      const isAmbil = e.action === 'ambil';
+      const d = new Date(e.ts);
+      const dateStr = d.toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' });
+      const timeStr = d.toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' });
+      return `
+      <div class="ticket">
+        <div class="perf-strip ${isAmbil?'ambil':'kembali'}"></div>
+        <div class="ticket-top">
+          <span class="ticket-action ${isAmbil?'ambil':'kembali'}">${isAmbil?'Ambil Barang':'Kembalikan Barang'}</span>
+          <div class="ticket-item">${escapeHtml(e.itemName)}</div>
+          <div class="ticket-meta">Qty ${e.qty} ${escapeHtml(e.unit||'')} · ${escapeHtml(e.barcode)}</div>
+        </div>
+        <div class="ticket-perf">
+          <span>Oleh <b>${escapeHtml(e.employee)}</b></span>
+          <span>${dateStr}, ${timeStr}</span>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function emptyState(msg){
+    return `<div class="empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 8h.01M16 8h.01M8 16h8"/></svg>
+      <p>${escapeHtml(msg)}</p>
+    </div>`;
+  }
+
+  function escapeHtml(str){
+    const d = document.createElement('div');
+    d.textContent = str == null ? '' : String(str);
+    return d.innerHTML;
+  }
+
+  loadData();
+})();
+</script>
+</body>
+</html>
