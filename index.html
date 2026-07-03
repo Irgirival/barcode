@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AsetScan — Manajemen Aset & Riwayat Perawatan</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/JsBarcode/3.11.5/JsBarcode.all.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.12.1/JsBarcode.all.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&family=Barlow:wght@400;500;600&display=swap');
 
@@ -87,6 +87,7 @@
   .asset-icons{ display:flex; gap:6px; flex-shrink:0; }
   .icon-btn{ background:none; border:1.5px solid #d9d5c8; color:var(--ink-dim); border-radius:6px; padding:6px 8px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
   .icon-btn:hover{ border-color: var(--amber); color: var(--amber); }
+  .icon-btn.danger:hover{ border-color: var(--red); color: var(--red); }
   .icon-btn svg{ width:15px; height:15px; }
   .asset-meta{ display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
   .tag{ font-family:var(--mono); font-size:10.5px; padding:4px 9px; border-radius:20px; }
@@ -560,14 +561,20 @@
     overlay.classList.add('active');
     document.getElementById('mClose').addEventListener('click', closeModal);
     document.getElementById('mCancel').addEventListener('click', closeModal);
-    try{ JsBarcode("#bcSvgPreview", asset.barcode, { format:"CODE128", width:2, height:55, fontSize:12, margin:6 }); }catch(e){}
+    try{
+      if(typeof JsBarcode === 'undefined') throw new Error('lib not loaded');
+      JsBarcode("#bcSvgPreview", asset.barcode, { format:"CODE128", width:2, height:55, fontSize:12, margin:6 });
+    }catch(e){ toast('Gagal memuat library barcode, coba muat ulang halaman', true); }
     document.getElementById('pPrint').addEventListener('click', ()=> printLabel(asset));
   }
 
   function printLabel(asset){
     const grid = document.getElementById('labelGrid');
     grid.innerHTML = `<div class="label-tile"><svg id="lbl-svg-0"></svg><div class="lt-name">${escapeHtml(asset.name)}</div><div class="lt-code">${escapeHtml(asset.barcode)} · ${escapeHtml(asset.lokasi)}</div></div>`;
-    try{ JsBarcode('#lbl-svg-0', asset.barcode, { format:"CODE128", width:2, height:50, fontSize:11, margin:4 }); }catch(e){}
+    try{
+      if(typeof JsBarcode === 'undefined') throw new Error('lib not loaded');
+      JsBarcode('#lbl-svg-0', asset.barcode, { format:"CODE128", width:2, height:50, fontSize:11, margin:4 });
+    }catch(e){ toast('Gagal memuat library barcode, coba muat ulang halaman', true); return; }
     setTimeout(()=> window.print(), 150);
   }
 
@@ -594,6 +601,9 @@
             <button class="icon-btn" data-print="${idx}" title="Cetak label barcode">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 9V3h12v6M6 18H4a1 1 0 01-1-1v-5a1 1 0 011-1h16a1 1 0 011 1v5a1 1 0 01-1 1h-2M6 14h12v7H6z"/></svg>
             </button>
+            <button class="icon-btn danger" data-del="${idx}" title="Hapus aset">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2m3 0l-1 14a1 1 0 01-1 1H7a1 1 0 01-1-1L5 6h14z"/></svg>
+            </button>
           </div>
         </div>
         <div class="asset-meta">
@@ -604,6 +614,34 @@
     }).join('');
     list.querySelectorAll('[data-print]').forEach(btn=> btn.addEventListener('click', ()=> openPrintModal(assets[parseInt(btn.dataset.print,10)])));
     list.querySelectorAll('[data-edit]').forEach(btn=> btn.addEventListener('click', ()=> openEditAssetModal(assets[parseInt(btn.dataset.edit,10)])));
+    list.querySelectorAll('[data-del]').forEach(btn=> btn.addEventListener('click', ()=> openDeleteConfirm(assets[parseInt(btn.dataset.del,10)])));
+  }
+
+  function openDeleteConfirm(asset){
+    const svcCount = serviceEntries.filter(s => s.barcode === asset.barcode).length;
+    modalContent.innerHTML = `
+      <div class="modal-head">
+        <div class="modal-title">Hapus Aset Ini?</div>
+        <button class="modal-close" id="mClose">&times;</button>
+      </div>
+      <div class="item-barcode">${escapeHtml(asset.name)} · ${escapeHtml(asset.barcode)}</div>
+      <div class="stock-hint">${svcCount > 0 ? svcCount + ' riwayat servis aset ini akan ikut terhapus. ' : ''}Tindakan ini tidak bisa dibatalkan.</div>
+      <div class="modal-actions">
+        <button class="btn" id="dConfirm" style="background:var(--red);color:#2a0e0a;">Ya, Hapus Aset</button>
+        <button class="btn btn-outline" id="mCancel">Batal</button>
+      </div>
+    `;
+    overlay.classList.add('active');
+    document.getElementById('mClose').addEventListener('click', closeModal);
+    document.getElementById('mCancel').addEventListener('click', closeModal);
+    document.getElementById('dConfirm').addEventListener('click', async ()=>{
+      assets = assets.filter(a => a.barcode !== asset.barcode);
+      serviceEntries = serviceEntries.filter(s => s.barcode !== asset.barcode);
+      await saveAssets(); await saveService();
+      renderAssets(); renderServiceList();
+      closeModal();
+      toast('Aset dihapus: ' + asset.name);
+    });
   }
 
   // SERVICE TAB
