@@ -8,922 +8,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.12.1/JsBarcode.all.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&family=Barlow:wght@400;500;600&display=swap');
-
-  :root{
-    --bg: #16181d;
-    --bg-raised: #1f2229;
-    --card: #f6f4ee;
-    --ink: #17181c;
-    --ink-dim: #6b6f76;
-    --line: #33363f;
-    --amber: #ff8a1e;
-    --green: #48b96b;
-    --red: #e05c4c;
-    --indigo: #7c8bd6;
-    --mono: 'IBM Plex Mono', monospace;
-    --cond: 'Barlow Condensed', sans-serif;
-    --sans: 'Barlow', sans-serif;
-  }
-  *{box-sizing:border-box; margin:0; padding:0;}
-  body{
-    background: var(--bg); color: var(--card); font-family: var(--sans); min-height:100vh;
-    background-image: repeating-linear-gradient(90deg, rgba(255,255,255,0.025) 0px, rgba(255,255,255,0.025) 2px, transparent 2px, transparent 14px);
-  }
-  .app{ max-width: 640px; margin:0 auto; min-height:100vh; display:flex; flex-direction:column; }
-
-  header.top{ padding: 22px 20px 16px; border-bottom: 1px solid var(--line); display:flex; align-items:center; justify-content:space-between; }
-  .brand{ display:flex; align-items:center; gap:10px; }
-  .brand-mark{ width:34px; height:34px; border-radius:6px; background: var(--amber); display:flex; align-items:center; justify-content:center; color:#16181d; font-family: var(--mono); font-weight:700; font-size:15px; }
-  .brand-name{ font-family: var(--cond); font-weight:800; font-size:22px; letter-spacing:0.5px; }
-  .brand-sub{ font-family: var(--mono); font-size:9.5px; color: var(--ink-dim); letter-spacing:1px; text-transform:uppercase; }
-
-  nav.tabs{ display:flex; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--bg); z-index:10; }
-  .tab{ flex:1; text-align:center; padding:13px 8px; font-family:var(--cond); font-weight:700; font-size:16px; letter-spacing:0.5px; color:var(--ink-dim); cursor:pointer; border-bottom:3px solid transparent; transition: all .15s; background:none; border-top:none; border-left:none; border-right:none; }
-  .tab.active{ color: var(--amber); border-bottom-color: var(--amber); }
-  .tab:hover:not(.active){ color: var(--card); }
-
-  main{ flex:1; padding: 20px 18px 60px; }
-  .view{ display:none; }
-  .view.active{ display:block; animation: fadein .25s ease; }
-  @keyframes fadein{ from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);} }
-
-  .scan-frame{ position:relative; background:var(--bg-raised); border:1px solid var(--line); border-radius:10px; aspect-ratio: 1/1; max-height: 340px; overflow:hidden; display:flex; align-items:center; justify-content:center; }
-  #reader{ width:100%; }
-  .scan-placeholder{ text-align:center; color:var(--ink-dim); padding:20px; }
-  .scan-placeholder svg{ width:52px; height:52px; margin-bottom:10px; opacity:.6; }
-  .corner{ position:absolute; width:26px; height:26px; border-color: var(--amber); pointer-events:none; z-index:5; }
-  .c-tl{ top:10px; left:10px; border-top:3px solid; border-left:3px solid; }
-  .c-tr{ top:10px; right:10px; border-top:3px solid; border-right:3px solid; }
-  .c-bl{ bottom:10px; left:10px; border-bottom:3px solid; border-left:3px solid; }
-  .c-br{ bottom:10px; right:10px; border-bottom:3px solid; border-right:3px solid; }
-
-  .btn{ font-family: var(--cond); font-weight:700; font-size:17px; letter-spacing:0.4px; padding:13px 20px; border-radius:7px; border:none; cursor:pointer; width:100%; transition: transform .1s, opacity .15s; }
-  .btn:active{ transform: scale(0.98); }
-  .btn-amber{ background: var(--amber); color:#17181c; }
-  .btn-amber:hover{ opacity:.92; }
-  .btn-outline{ background:transparent; color:var(--card); border:1.5px solid var(--line); }
-  .btn-outline:hover{ border-color: var(--amber); color:var(--amber); }
-  .btn-sm{ padding:9px 14px; font-size:14px; width:auto; }
-
-  .scan-actions{ margin-top:14px; display:flex; flex-direction:column; gap:10px; }
-  .manual-row{ display:flex; gap:8px; margin-top:14px; }
-  .manual-row input{ flex:1; }
-
-  input, select, textarea{ background: var(--bg-raised); border:1px solid var(--line); color:var(--card); padding:11px 12px; border-radius:7px; font-family:var(--sans); font-size:14px; width:100%; outline:none; }
-  textarea{ resize:vertical; min-height:64px; }
-  input:focus, select:focus, textarea:focus{ border-color: var(--amber); }
-  input::placeholder, textarea::placeholder{ color: var(--ink-dim); }
-  label{ font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--ink-dim); display:block; margin-bottom:5px; margin-top:12px; }
-  label:first-child{ margin-top:0; }
-
-  .section-title{ font-family:var(--cond); font-weight:800; font-size:20px; margin-bottom:14px; display:flex; align-items:center; justify-content:space-between; }
-  .count-pill{ font-family:var(--mono); font-size:11px; background:var(--bg-raised); border:1px solid var(--line); padding:3px 9px; border-radius:20px; color:var(--ink-dim); }
-
-  /* ASSET LIST */
-  .asset-card{ background: var(--card); color: var(--ink); border-radius:9px; padding:14px; margin-bottom:10px; border-left: 4px solid var(--amber); }
-  .asset-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
-  .asset-name{ font-weight:700; font-size:15.5px; }
-  .asset-sub{ font-family:var(--mono); font-size:10.5px; color:var(--ink-dim); margin-top:2px; }
-  .asset-icons{ display:flex; gap:6px; flex-shrink:0; }
-  .icon-btn{ background:none; border:1.5px solid #d9d5c8; color:var(--ink-dim); border-radius:6px; padding:6px 8px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
-  .icon-btn:hover{ border-color: var(--amber); color: var(--amber); }
-  .icon-btn.danger:hover{ border-color: var(--red); color: var(--red); }
-  .icon-btn svg{ width:15px; height:15px; }
-  .asset-meta{ display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
-  .tag{ font-family:var(--mono); font-size:10.5px; padding:4px 9px; border-radius:20px; }
-  .tag-loc{ background:#e6e7fa; color:#4b4fa0; }
-  .tag-loc svg{ width:10px; height:10px; margin-right:3px; vertical-align:-1px; }
-  .tag-last{ background:#d7f0dd; color:#1f6b38; }
-  .tag-last.none{ background:#f2e6d9; color:#9a5a10; }
-
-  .fab-add{ margin-top:6px; }
-
-  /* SERVICE TICKET */
-  .svc-ticket{ background: var(--card); color: var(--ink); border-radius:8px; padding:0; margin-bottom:12px; position:relative; overflow:hidden; box-shadow: 0 2px 0 rgba(0,0,0,0.15); }
-  .svc-top{ padding:13px 14px 10px; }
-  .svc-strip{ position:absolute; left:0; top:0; bottom:0; width:5px; background: var(--indigo); }
-  .status-badge{ display:inline-block; font-family:var(--mono); font-size:10px; font-weight:700; letter-spacing:0.8px; text-transform:uppercase; padding:3px 8px; border-radius:4px; }
-  .status-badge.selesai{ background:#d7f0dd; color:#1f6b38; }
-  .status-badge.proses{ background:#fde3c8; color:#8a4a10; }
-  .svc-type{ display:inline-block; font-family:var(--mono); font-size:10px; color:#5a5ea3; background:#e6e7fa; padding:3px 8px; border-radius:4px; margin-bottom:7px; margin-right:5px; }
-  .svc-item{ font-weight:700; font-size:15.5px; margin-top:6px; }
-  .svc-loc{ font-family:var(--mono); font-size:11px; color:var(--ink-dim); margin-top:1px; }
-  .svc-desc{ font-size:13px; color:var(--ink-dim); margin-top:4px; line-height:1.4; }
-  .svc-perf{ border-top: 1px dashed #c9c5b8; padding:9px 14px; display:flex; justify-content:space-between; font-family:var(--mono); font-size:11.5px; color:var(--ink-dim); }
-  .svc-perf b{ color:var(--ink); font-weight:600; }
-
-  .mini-history{ background:#fff; border:1px solid #e4e0d3; border-radius:8px; padding:10px 12px; margin-top:6px; max-height:220px; overflow-y:auto; }
-  .mini-history .mh-row{ padding:8px 0; border-bottom:1px solid #f0ede2; font-size:12.5px; }
-  .mini-history .mh-row:last-child{ border-bottom:none; }
-  .mini-history .mh-top{ display:flex; justify-content:space-between; align-items:center; font-weight:600; color:var(--ink); gap:8px; }
-  .mini-history .mh-date{ font-family:var(--mono); font-size:10.5px; color:var(--ink-dim); white-space:nowrap; }
-  .mini-history .mh-desc{ color:var(--ink-dim); font-size:12px; margin-top:2px; }
-  .mini-history .mh-empty{ color:var(--ink-dim); font-size:12.5px; text-align:center; padding:8px 0; }
-
-  .asset-detail-box{ background:#fff; border:1px solid #e4e0d3; border-radius:8px; padding:12px 14px; margin-top:6px; }
-  .asset-detail-box .dl-row{ display:flex; justify-content:space-between; padding:4px 0; font-size:13px; }
-  .asset-detail-box .dl-row span:first-child{ color:var(--ink-dim); }
-  .asset-detail-box .dl-row span:last-child{ font-weight:600; color:var(--ink); }
-
-  .code-input-row{ display:flex; gap:8px; }
-  .code-input-row input{ flex:1; }
-  .btn-gen{ background: var(--bg-raised); border:1px solid var(--line); color:var(--card); font-family:var(--mono); font-size:11px; padding:0 12px; border-radius:7px; cursor:pointer; white-space:nowrap; }
-  .btn-gen:hover{ border-color: var(--amber); color: var(--amber); }
-
-  .barcode-preview{ background:#fff; border-radius:8px; padding:16px 10px; text-align:center; margin-top:14px; border:1px solid #e4e0d3; }
-  .barcode-preview svg{ max-width:100%; }
-  .barcode-preview .bp-name{ font-family:var(--sans); font-weight:700; font-size:14px; color:#17181c; margin-top:2px; }
-
-  .action-toggle{ display:flex; gap:8px; margin-top:6px; }
-  .action-toggle button{ flex:1; padding:11px; border-radius:7px; border:1.5px solid #d9d5c8; background:#fff; color:var(--ink); font-family:var(--cond); font-weight:700; font-size:15px; cursor:pointer; }
-  .action-toggle button.selected{ border-color: var(--amber); }
-
-  .modal-actions{ margin-top:20px; display:flex; flex-direction:column; gap:10px; }
-  .stock-hint{ font-family:var(--mono); font-size:12px; color:var(--ink-dim); margin-top:5px; }
-
-  .empty{ text-align:center; padding:50px 20px; color:var(--ink-dim); }
-  .empty svg{ width:44px; height:44px; margin-bottom:12px; opacity:.4; }
-  .empty p{ font-family:var(--mono); font-size:12.5px; }
-
-  .overlay{ position:fixed; inset:0; background:rgba(10,11,13,0.72); z-index:100; display:none; align-items:flex-end; justify-content:center; }
-  .overlay.active{ display:flex; }
-  .modal{ background: var(--card); color:var(--ink); width:100%; max-width:640px; border-radius:16px 16px 0 0; padding:22px 20px 26px; max-height:88vh; overflow-y:auto; animation: slideup .22s ease; }
-  @keyframes slideup{ from{ transform:translateY(30px); opacity:0; } to{ transform:translateY(0); opacity:1; } }
-  .modal-head{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:4px; }
-  .modal-title{ font-family:var(--cond); font-weight:800; font-size:22px; }
-  .modal-close{ background:none; border:none; font-size:22px; color:var(--ink-dim); cursor:pointer; line-height:1; padding:4px; }
-  .modal .item-barcode{ font-family:var(--mono); font-size:11px; color:var(--ink-dim); margin-bottom:6px; }
-  .modal label{ color:var(--ink-dim); }
-  .modal input, .modal select, .modal textarea{ background:#fff; color:var(--ink); border:1px solid #d9d5c8; }
-
-  .toast{ position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(100px); background: var(--green); color:#0d1f13; padding:12px 22px; border-radius:8px; font-family:var(--cond); font-weight:700; font-size:15px; z-index:200; transition: transform .3s ease; box-shadow: 0 6px 20px rgba(0,0,0,.3); }
-  .toast.show{ transform:translateX(-50%) translateY(0); }
-  .toast.err{ background: var(--red); color:#2a0e0a; }
-
-  .shared-note{ font-family:var(--mono); font-size:10.5px; color: var(--ink-dim); text-align:center; margin-top:16px; line-height:1.6; }
-
-  .login-screen{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
-  .login-box{ background: var(--card); color: var(--ink); width:100%; max-width:360px; border-radius:14px; padding:26px 24px; }
-  .login-box label{ color: var(--ink-dim); }
-  .login-box input{ background:#fff; color:var(--ink); border:1px solid #d9d5c8; }
-  .login-hint{ font-family:var(--mono); font-size:11.5px; color: var(--red); margin-top:12px; text-align:center; min-height:14px; }
-
-  .filter-bar{ display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
-  .filter-bar select{ flex:1; min-width:100px; font-size:12.5px; padding:9px 10px; }
-
-  #printArea{ display:none; }
-  @media print{
-    body *{ visibility:hidden; }
-    #printArea, #printArea *{ visibility:visible; }
-    #printArea{ display:block; position:absolute; top:0; left:0; width:100%; background:#fff; }
-    .label-grid{ display:grid; grid-template-columns:repeat(2, 1fr); gap:10px; padding:10px; }
-    .label-tile{ border:1px dashed #999; border-radius:4px; padding:10px 8px; text-align:center; break-inside: avoid; }
-    .label-tile svg{ max-width:100%; }
-    .label-tile .lt-name{ font-family:sans-serif; font-weight:700; font-size:13px; color:#000; margin-top:2px; }
-    .label-tile .lt-code{ font-family:monospace; font-size:10px; color:#333; }
-  }
-</style>
-</head>
-<body>
-<div class="login-screen" id="loginScreen">
-  <div class="login-box">
-    <div class="brand" style="justify-content:center; margin-bottom:18px;">
-      <div class="brand-mark">▮▯▮</div>
-      <div>
-        <div class="brand-name">AsetScan</div>
-        <div class="brand-sub">Aset · Lokasi · Riwayat Perawatan</div>
-      </div>
-    </div>
-    <label>Email</label>
-    <input type="email" id="loginEmail" placeholder="nama@perusahaan.com" autocomplete="username">
-    <label>Password</label>
-    <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
-    <div class="modal-actions">
-      <button class="btn btn-amber" id="btnLogin">Masuk</button>
-    </div>
-    <div class="login-hint" id="loginError"></div>
-  </div>
-</div>
-
-<div class="app" id="mainApp" style="display:none;">
-  <header class="top">
-    <div class="brand">
-      <div class="brand-mark">▮▯▮</div>
-      <div>
-        <div class="brand-name">AsetScan</div>
-        <div class="brand-sub">Aset · Lokasi · Riwayat Perawatan</div>
-      </div>
-    </div>
-    <div style="display:flex; align-items:center; gap:8px;">
-      <span class="count-pill" id="assetCountPill">0 aset</span>
-      <button class="icon-btn" id="btnLogout" title="Keluar">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
-      </button>
-    </div>
-  </header>
-
-  <nav class="tabs">
-    <button class="tab active" data-view="scan">Scan</button>
-    <button class="tab" data-view="asset">Aset</button>
-    <button class="tab" data-view="service">Servis</button>
-  </nav>
-
-  <main>
-    <!-- SCAN VIEW -->
-    <section class="view active" id="view-scan">
-      <div class="scan-frame" id="scanFrame">
-        <div class="corner c-tl"></div><div class="corner c-tr"></div>
-        <div class="corner c-bl"></div><div class="corner c-br"></div>
-        <div id="reader"></div>
-        <div class="scan-placeholder" id="scanPlaceholder">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v7M14 20h4"/></svg>
-          <div>Kamera belum aktif</div>
-        </div>
-      </div>
-      <div class="scan-actions">
-        <button class="btn btn-amber" id="btnStartScan">Mulai Scan Barcode Aset</button>
-        <button class="btn btn-outline" id="btnStopScan" style="display:none;">Hentikan Kamera</button>
-      </div>
-      <div class="manual-row">
-        <input type="text" id="manualBarcode" placeholder="atau ketik kode barcode manual…">
-        <button class="btn btn-outline btn-sm" id="btnManualGo">Cari</button>
-      </div>
-      <p class="shared-note">Scan barcode di badan aset untuk melihat jenis, lokasi, dan riwayat perawatan terakhirnya. Data tersimpan dan terlihat oleh semua pengguna aplikasi ini.</p>
-    </section>
-
-    <!-- ASSET VIEW -->
-    <section class="view" id="view-asset">
-      <div class="section-title">Daftar Aset <span class="count-pill" id="astCountPill">0</span></div>
-      <div id="assetList"></div>
-      <button class="btn btn-outline fab-add" id="btnAddAsset">+ Daftarkan Aset Baru</button>
-    </section>
-
-    <!-- SERVICE VIEW -->
-    <section class="view" id="view-service">
-      <div class="section-title">Riwayat Servis &amp; Perawatan <span class="count-pill" id="svcCountPill">0</span></div>
-      <div class="filter-bar">
-        <select id="filterJenis"><option value="all">Semua Jenis</option></select>
-        <select id="filterAsset"><option value="all">Semua Aset</option></select>
-        <select id="filterStatus">
-          <option value="all">Semua Status</option>
-          <option value="Selesai">Selesai</option>
-          <option value="Dalam Proses">Dalam Proses</option>
-        </select>
-      </div>
-      <div id="serviceList"></div>
-      <button class="btn btn-outline fab-add" id="btnAddServiceMain">+ Catat Servis Baru</button>
-    </section>
-  </main>
-</div>
-
-<div class="overlay" id="modalOverlay"><div class="modal" id="modalContent"></div></div>
-<div class="toast" id="toast"></div>
-<div id="printArea"><div class="label-grid" id="labelGrid"></div></div>
-
-<script>
-(function(){
-  const SUPABASE_URL = 'https://jwfpkwwzbyjyccnksmsu.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp3ZnBrd3d6YnlqeWNjbmtzbXN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMwNTI1ODksImV4cCI6MjA5ODYyODU4OX0.4jMupGbGAwUEDplmCiThMyZqRe-hSca_zNPXzkszjoc';
-  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-  const loginScreen = document.getElementById('loginScreen');
-  const mainApp = document.getElementById('mainApp');
-  const loginError = document.getElementById('loginError');
-  let currentUser = null; // { email, displayName, role }
-
-  async function checkSession(){
-    const { data: { session } } = await sb.auth.getSession();
-    if(session){
-      const meta = session.user.user_metadata || {};
-      currentUser = {
-        email: session.user.email,
-        displayName: meta.display_name || session.user.email,
-        role: meta.role || 'teknisi'
-      };
-      loginScreen.style.display = 'none';
-      mainApp.style.display = 'flex';
-      applyRoleUI();
-      loadData();
-    } else {
-      currentUser = null;
-      loginScreen.style.display = 'flex';
-      mainApp.style.display = 'none';
-    }
-  }
-
-  function isAdmin(){ return currentUser && currentUser.role === 'admin'; }
-
-  function applyRoleUI(){
-    document.getElementById('btnAddAsset').style.display = isAdmin() ? 'block' : 'none';
-  }
-
-  document.getElementById('btnLogin').addEventListener('click', doLogin);
-  document.getElementById('loginPassword').addEventListener('keydown', (e)=>{ if(e.key === 'Enter') doLogin(); });
-
-  async function doLogin(){
-    const email = document.getElementById('loginEmail').value.trim();
-    const password = document.getElementById('loginPassword').value;
-    loginError.textContent = '';
-    if(!email || !password){ loginError.textContent = 'Isi email dan password.'; return; }
-    const btn = document.getElementById('btnLogin');
-    btn.disabled = true; btn.textContent = 'Memeriksa...';
-    const { error } = await sb.auth.signInWithPassword({ email, password });
-    btn.disabled = false; btn.textContent = 'Masuk';
-    if(error){ loginError.textContent = 'Login gagal: email atau password salah.'; return; }
-    checkSession();
-  }
-
-  document.getElementById('btnLogout').addEventListener('click', async ()=>{
-    await sb.auth.signOut();
-    checkSession();
-  });
-
-  let assets = [];
-  let serviceEntries = [];
-  let filterJenis = 'all';
-  let filterAsset = 'all';
-  let filterStatus = 'all';
-  let html5QrCode = null;
-  let scanning = false;
-
-  const seedAssets = [
-    { barcode:'AC-0001', name:'AC Split 1PK', jenis:'AC', lokasi:'Ruang Server Lt.2' },
-    { barcode:'AC-0002', name:'AC Split 2PK', jenis:'AC', lokasi:'Ruang Meeting Lt.3' },
-    { barcode:'AC-0003', name:'AC Cassette 3PK', jenis:'AC', lokasi:'Lobby Utama Lt.1' },
-    { barcode:'AC-0004', name:'AC Split 1PK', jenis:'AC', lokasi:'Ruang HRD Lt.2' },
-    { barcode:'AC-0005', name:'AC Split 1.5PK', jenis:'AC', lokasi:'Ruang Direktur Lt.4' },
-    { barcode:'KP-0001', name:'Kipas Angin Berdiri', jenis:'Kipas', lokasi:'Ruang Produksi Lt.1' },
-    { barcode:'KP-0002', name:'Kipas Angin Dinding', jenis:'Kipas', lokasi:'Gudang Belakang' },
-    { barcode:'KP-0003', name:'Kipas Angin Berdiri', jenis:'Kipas', lokasi:'Ruang Meeting Lt.3' },
-    { barcode:'KP-0004', name:'Kipas Exhaust', jenis:'Kipas', lokasi:'Dapur Kantin' },
-  ];
-  const seedService = [
-    { id:'seed1', barcode:'AC-0001', item_name:'AC Split 1PK', svc_type:'Servis Rutin', technician:'Budi (Teknisi Internal)', description:'Cleaning unit indoor & outdoor, cek tekanan freon normal', status:'Selesai', ts:new Date(Date.now()-1000*60*60*24*30).toISOString() },
-    { id:'seed2', barcode:'AC-0003', item_name:'AC Cassette 3PK', svc_type:'Perbaikan', technician:'CV Sejuk Abadi', description:'Ganti kapasitor kompresor, unit sempat mati total', status:'Selesai', ts:new Date(Date.now()-1000*60*60*24*10).toISOString() },
-    { id:'seed3', barcode:'KP-0001', item_name:'Kipas Angin Berdiri', svc_type:'Cleaning Indoor', technician:'Budi (Teknisi Internal)', description:'Bersihkan baling-baling dan kisi-kisi dari debu', status:'Selesai', ts:new Date(Date.now()-1000*60*60*24*5).toISOString() },
-  ];
-
-  function toast(msg, isErr){
-    const t = document.getElementById('toast');
-    t.textContent = msg;
-    t.className = 'toast show' + (isErr ? ' err' : '');
-    setTimeout(()=> t.classList.remove('show'), 2400);
-  }
-
-  function mapAssetRow(r){ return { barcode:r.barcode, name:r.name, jenis:r.jenis, lokasi:r.lokasi }; }
-  function mapServiceRow(r){ return { id:r.id, barcode:r.barcode, itemName:r.item_name, svcType:r.svc_type, technician:r.technician, description:r.description, status:r.status, ts:r.ts }; }
-
-  async function loadData(){
-    let { data: astData, error: astErr } = await sb.from('assets').select('*').order('name', { ascending:true });
-    if(astErr){
-      toast('Gagal terhubung ke database: ' + astErr.message, true);
-      assets = []; serviceEntries = [];
-      renderAssets(); renderServiceList();
-      return;
-    }
-    if(astData.length === 0){
-      const { error: seedErr } = await sb.from('assets').insert(seedAssets);
-      if(!seedErr){
-        const { error: seedSvcErr } = await sb.from('service_entries').insert(seedService);
-        const reload = await sb.from('assets').select('*').order('name', { ascending:true });
-        astData = reload.data || seedAssets;
-      }
-    }
-    assets = astData.map(mapAssetRow);
-
-    const { data: svcData, error: svcErr } = await sb.from('service_entries').select('*').order('ts', { ascending:false });
-    if(svcErr){ toast('Gagal memuat riwayat servis: ' + svcErr.message, true); serviceEntries = []; }
-    else serviceEntries = svcData.map(mapServiceRow);
-
-    renderAssets(); renderServiceList();
-  }
-
-  async function insertAssetDb(asset){
-    const { error } = await sb.from('assets').insert([{ barcode: asset.barcode, name: asset.name, jenis: asset.jenis, lokasi: asset.lokasi }]);
-    return error;
-  }
-  async function updateAssetDb(asset){
-    const { error } = await sb.from('assets').update({ name: asset.name, jenis: asset.jenis, lokasi: asset.lokasi }).eq('barcode', asset.barcode);
-    return error;
-  }
-  async function deleteAssetDb(barcode){
-    const { error } = await sb.from('assets').delete().eq('barcode', barcode);
-    return error;
-  }
-  async function insertServiceDb(entry){
-    const { error } = await sb.from('service_entries').insert([{
-      id: entry.id, barcode: entry.barcode, item_name: entry.itemName, svc_type: entry.svcType,
-      technician: entry.technician, description: entry.description, status: entry.status, ts: entry.ts
-    }]);
-    return error;
-  }
-
-  // TABS
-  document.querySelectorAll('.tab').forEach(tab=>{
-    tab.addEventListener('click', ()=>{
-      document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-      document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-      tab.classList.add('active');
-      document.getElementById('view-'+tab.dataset.view).classList.add('active');
-      if(tab.dataset.view !== 'scan' && scanning) stopScan();
-    });
-  });
-
-  // SCANNING
-  document.getElementById('btnStartScan').addEventListener('click', startScan);
-  document.getElementById('btnStopScan').addEventListener('click', stopScan);
-
-  function startScan(){
-    document.getElementById('scanPlaceholder').style.display = 'none';
-    document.getElementById('btnStartScan').style.display = 'none';
-    document.getElementById('btnStopScan').style.display = 'block';
-    html5QrCode = new Html5Qrcode("reader");
-    const config = { fps: 10, qrbox: { width: 220, height: 220 } };
-    html5QrCode.start({ facingMode: "environment" }, config,
-      (decodedText)=>{ onBarcodeDetected(decodedText); }, ()=>{}
-    ).then(()=>{ scanning = true; })
-    .catch(()=>{ toast('Tidak bisa akses kamera. Cek izin kamera browser.', true); resetScanUI(); });
-  }
-  function stopScan(){
-    if(html5QrCode && scanning){ html5QrCode.stop().then(()=>{ html5QrCode.clear(); resetScanUI(); }).catch(()=>resetScanUI()); }
-    else resetScanUI();
-  }
-  function resetScanUI(){
-    scanning = false;
-    document.getElementById('scanPlaceholder').style.display = 'block';
-    document.getElementById('btnStartScan').style.display = 'block';
-    document.getElementById('btnStopScan').style.display = 'none';
-  }
-  document.getElementById('btnManualGo').addEventListener('click', ()=>{
-    const val = document.getElementById('manualBarcode').value.trim();
-    if(val) onBarcodeDetected(val);
-  });
-  document.getElementById('manualBarcode').addEventListener('keydown', (e)=>{ if(e.key === 'Enter') document.getElementById('btnManualGo').click(); });
-
-  function onBarcodeDetected(code){
-    if(scanning) stopScan();
-    const asset = assets.find(a => a.barcode === code);
-    if(asset){ openAssetModal(asset); return; }
-    if(!isAdmin()){ toast('Aset belum terdaftar. Minta admin untuk mendaftarkannya.', true); return; }
-    openNewAssetModal(code, true);
-  }
-
-  // MODALS
-  const overlay = document.getElementById('modalOverlay');
-  const modalContent = document.getElementById('modalContent');
-  function closeModal(){ overlay.classList.remove('active'); modalContent.innerHTML=''; }
-  overlay.addEventListener('click', (e)=>{ if(e.target === overlay) closeModal(); });
-
-  function lastServiceFor(barcode){
-    const list = serviceEntries.filter(s => s.barcode === barcode);
-    if(list.length === 0) return null;
-    return list.slice().sort((a,b)=> new Date(b.ts) - new Date(a.ts))[0];
-  }
-
-  function openAssetModal(asset){
-    modalContent.innerHTML = `
-      <div class="modal-head">
-        <div class="modal-title">${escapeHtml(asset.name)}</div>
-        <button class="modal-close" id="mClose">&times;</button>
-      </div>
-      <div class="item-barcode">${escapeHtml(asset.barcode)}</div>
-
-      <div class="asset-detail-box">
-        <div class="dl-row"><span>Jenis</span><span>${escapeHtml(asset.jenis)}</span></div>
-        <div class="dl-row"><span>Lokasi</span><span>${escapeHtml(asset.lokasi)}</span></div>
-      </div>
-
-      <label>Riwayat Servis / Perawatan</label>
-      <div class="mini-history" id="mMiniHistory">${renderMiniHistory(asset.barcode)}</div>
-
-      <div class="modal-actions">
-        <button class="btn btn-amber" id="mAddService">+ Catat Servis / Perawatan</button>
-        ${isAdmin() ? '<button class="btn btn-outline" id="mEditAsset">Ubah Jenis / Lokasi</button>' : ''}
-      </div>
-    `;
-    overlay.classList.add('active');
-    document.getElementById('mClose').addEventListener('click', closeModal);
-    document.getElementById('mAddService').addEventListener('click', ()=> openServiceModal(asset));
-    const editBtn = document.getElementById('mEditAsset');
-    if(editBtn) editBtn.addEventListener('click', ()=> openEditAssetModal(asset));
-  }
-
-  function renderMiniHistory(barcode){
-    const records = serviceEntries.filter(s => s.barcode === barcode).slice().sort((a,b)=> new Date(b.ts)-new Date(a.ts));
-    if(records.length === 0) return '<div class="mh-empty">Belum ada riwayat servis untuk aset ini</div>';
-    return records.map(r => {
-      const d = new Date(r.ts);
-      const dateStr = d.toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' });
-      return `<div class="mh-row">
-        <div class="mh-top"><span>${escapeHtml(r.svcType)}</span><span class="mh-date">${dateStr}</span></div>
-        <div class="mh-desc">${escapeHtml(r.description || '-')} · ${escapeHtml(r.technician || '-')}</div>
-      </div>`;
-    }).join('');
-  }
-
-  function openServiceModal(asset){
-    const today = new Date().toISOString().slice(0,10);
-    modalContent.innerHTML = `
-      <div class="modal-head">
-        <div class="modal-title">Catat Servis / Perawatan</div>
-        <button class="modal-close" id="mClose">&times;</button>
-      </div>
-      <div class="item-barcode">${escapeHtml(asset.name)} · ${escapeHtml(asset.barcode)} · ${escapeHtml(asset.lokasi)}</div>
-
-      <label>Jenis Kegiatan</label>
-      <select id="sType">
-        <option>Cleaning Outdoor</option>
-        <option>Cleaning Indoor</option>
-        <option>Servis Rutin</option>
-        <option>Perbaikan</option>
-        <option>Kalibrasi</option>
-        <option>Penggantian Sparepart</option>
-        <option>Lainnya</option>
-      </select>
-
-      <label>Tanggal</label>
-      <input type="date" id="sDate" value="${today}">
-
-      <label>Teknisi</label>
-      <input type="text" id="sTech" value="${escapeHtml(currentUser ? currentUser.displayName : '')}" readonly>
-
-      <label>Deskripsi Pekerjaan</label>
-      <textarea id="sDesc" placeholder="Contoh: cleaning outdoor, cek tekanan freon..."></textarea>
-
-      <label>Status</label>
-      <div class="action-toggle">
-        <button type="button" class="selected" data-st="Selesai">Selesai</button>
-        <button type="button" data-st="Dalam Proses">Dalam Proses</button>
-      </div>
-
-      <div class="modal-actions">
-        <button class="btn btn-amber" id="sSubmit">Simpan Riwayat</button>
-        <button class="btn btn-outline" id="mCancel">Batal</button>
-      </div>
-    `;
-    overlay.classList.add('active');
-    let selectedStatus = 'Selesai';
-    document.getElementById('mClose').addEventListener('click', closeModal);
-    document.getElementById('mCancel').addEventListener('click', closeModal);
-    modalContent.querySelectorAll('.action-toggle button').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        selectedStatus = btn.dataset.st;
-        modalContent.querySelectorAll('.action-toggle button').forEach(b=> b.classList.remove('selected'));
-        btn.classList.add('selected');
-      });
-    });
-    document.getElementById('sSubmit').addEventListener('click', async ()=>{
-      const svcType = document.getElementById('sType').value;
-      const date = document.getElementById('sDate').value || today;
-      const technician = currentUser ? currentUser.displayName : 'Tidak diketahui';
-      const description = document.getElementById('sDesc').value.trim();
-      const submitBtn = document.getElementById('sSubmit');
-      submitBtn.disabled = true;
-      const newEntry = {
-        id: Date.now().toString(36), barcode: asset.barcode, itemName: asset.name,
-        svcType, technician, description, status: selectedStatus, ts: new Date(date).toISOString()
-      };
-      const error = await insertServiceDb(newEntry);
-      if(error){ toast('Gagal menyimpan: ' + error.message, true); submitBtn.disabled = false; return; }
-      serviceEntries.unshift(newEntry);
-      renderServiceList(); renderAssets();
-      toast('Riwayat servis tersimpan');
-      closeModal();
-    });
-  }
-
-  function openEditAssetModal(asset){
-    modalContent.innerHTML = `
-      <div class="modal-head">
-        <div class="modal-title">Ubah Data Aset</div>
-        <button class="modal-close" id="mClose">&times;</button>
-      </div>
-      <div class="item-barcode">${escapeHtml(asset.barcode)}</div>
-      <label>Jenis</label>
-      <div class="action-toggle" id="eJenisToggle">
-        <button type="button" data-jenis="AC" class="${asset.jenis === 'AC' ? 'selected' : ''}">AC</button>
-        <button type="button" data-jenis="Kipas" class="${asset.jenis !== 'AC' ? 'selected' : ''}">Kipas</button>
-      </div>
-      <label>Nama Aset</label>
-      <input type="text" id="eName" value="${escapeHtml(asset.name)}">
-      <label>Lokasi</label>
-      <input type="text" id="eLokasi" value="${escapeHtml(asset.lokasi)}">
-      <div class="modal-actions">
-        <button class="btn btn-amber" id="eSubmit">Simpan Perubahan</button>
-        <button class="btn btn-outline" id="mCancel">Batal</button>
-      </div>
-    `;
-    overlay.classList.add('active');
-    document.getElementById('mClose').addEventListener('click', closeModal);
-    document.getElementById('mCancel').addEventListener('click', closeModal);
-    let selectedJenis = asset.jenis === 'AC' ? 'AC' : 'Kipas';
-    document.getElementById('eJenisToggle').querySelectorAll('button').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        selectedJenis = btn.dataset.jenis;
-        modalContent.querySelectorAll('#eJenisToggle button').forEach(b=> b.classList.remove('selected'));
-        btn.classList.add('selected');
-      });
-    });
-    document.getElementById('eSubmit').addEventListener('click', async ()=>{
-      const updated = {
-        barcode: asset.barcode,
-        name: document.getElementById('eName').value.trim() || asset.name,
-        jenis: selectedJenis,
-        lokasi: document.getElementById('eLokasi').value.trim() || asset.lokasi,
-      };
-      const error = await updateAssetDb(updated);
-      if(error){ toast('Gagal menyimpan: ' + error.message, true); return; }
-      asset.name = updated.name; asset.jenis = updated.jenis; asset.lokasi = updated.lokasi;
-      renderAssets();
-      toast('Data aset diperbarui');
-      closeModal();
-    });
-  }
-
-  function generateInternalCode(){
-    const rand = Math.floor(1000 + Math.random()*9000);
-    return 'AST' + Date.now().toString(36).toUpperCase().slice(-5) + rand;
-  }
-
-  function openNewAssetModal(code, fromScan){
-    modalContent.innerHTML = `
-      <div class="modal-head">
-        <div class="modal-title">Aset Belum Terdaftar</div>
-        <button class="modal-close" id="mClose">&times;</button>
-      </div>
-      <label>Jenis</label>
-      <div class="action-toggle" id="nJenisToggle">
-        <button type="button" class="selected" data-jenis="AC">AC</button>
-        <button type="button" data-jenis="Kipas">Kipas</button>
-      </div>
-      <label>Nama Aset</label>
-      <input type="text" id="nName" placeholder="Contoh: AC Split 1PK atau Kipas Angin Berdiri">
-      <label>Lokasi</label>
-      <input type="text" id="nLokasi" placeholder="Contoh: Ruang Server Lt.2">
-      <label>Kode Barcode</label>
-      <div class="code-input-row">
-        <input type="text" id="nCode" value="${escapeHtml(code)}" ${fromScan ? 'readonly' : ''}>
-        ${fromScan ? '' : '<button type="button" class="btn-gen" id="nGenCode">Generate</button>'}
-      </div>
-      <div class="stock-hint">${fromScan ? 'Kode ini terbaca dari hasil scan kamera.' : 'Kosongkan lalu klik Generate untuk kode internal otomatis, atau isi manual kalau aset sudah punya nomor sendiri.'}</div>
-      <div class="modal-actions">
-        <button class="btn btn-amber" id="nSubmit">Simpan Aset</button>
-        <button class="btn btn-outline" id="mCancel">Batal</button>
-      </div>
-    `;
-    overlay.classList.add('active');
-    document.getElementById('mClose').addEventListener('click', closeModal);
-    document.getElementById('mCancel').addEventListener('click', closeModal);
-    const genBtn = document.getElementById('nGenCode');
-    if(genBtn) genBtn.addEventListener('click', ()=>{ document.getElementById('nCode').value = generateInternalCode(); });
-    let selectedJenis = 'AC';
-    document.getElementById('nJenisToggle').querySelectorAll('button').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        selectedJenis = btn.dataset.jenis;
-        modalContent.querySelectorAll('#nJenisToggle button').forEach(b=> b.classList.remove('selected'));
-        btn.classList.add('selected');
-      });
-    });
-    document.getElementById('nSubmit').addEventListener('click', async ()=>{
-      const name = document.getElementById('nName').value.trim();
-      const jenis = selectedJenis;
-      const lokasi = document.getElementById('nLokasi').value.trim() || '-';
-      let finalCode = document.getElementById('nCode').value.trim();
-      if(!name){ toast('Isi nama aset dulu', true); return; }
-      if(!finalCode) finalCode = generateInternalCode();
-      if(assets.some(a => a.barcode === finalCode)){ toast('Kode barcode sudah dipakai aset lain', true); return; }
-      const newAsset = { barcode: finalCode, name, jenis, lokasi };
-      const error = await insertAssetDb(newAsset);
-      if(error){ toast('Gagal menyimpan: ' + error.message, true); return; }
-      assets.push(newAsset);
-      renderAssets();
-      closeModal();
-      toast('Aset baru terdaftar: ' + name);
-      openPrintModal(newAsset);
-    });
-  }
-
-  document.getElementById('btnAddAsset').addEventListener('click', ()=>{
-    openNewAssetModal(generateInternalCode(), false);
-  });
-
-  function openPrintModal(asset){
-    modalContent.innerHTML = `
-      <div class="modal-head">
-        <div class="modal-title">Cetak Label Barcode</div>
-        <button class="modal-close" id="mClose">&times;</button>
-      </div>
-      <div class="item-barcode">${escapeHtml(asset.name)} · ${escapeHtml(asset.lokasi)}</div>
-      <div class="barcode-preview">
-        <svg id="bcSvgPreview"></svg>
-        <div class="bp-name">${escapeHtml(asset.name)}</div>
-      </div>
-      <div class="modal-actions">
-        <button class="btn btn-amber" id="pPrint">Cetak Label Ini</button>
-        <button class="btn btn-outline" id="mCancel">Tutup</button>
-      </div>
-    `;
-    overlay.classList.add('active');
-    document.getElementById('mClose').addEventListener('click', closeModal);
-    document.getElementById('mCancel').addEventListener('click', closeModal);
-    try{
-      if(typeof JsBarcode === 'undefined') throw new Error('lib not loaded');
-      JsBarcode("#bcSvgPreview", asset.barcode, { format:"CODE128", width:2, height:55, fontSize:12, margin:6 });
-    }catch(e){ toast('Gagal memuat library barcode, coba muat ulang halaman', true); }
-    document.getElementById('pPrint').addEventListener('click', ()=> printLabel(asset));
-  }
-
-  function printLabel(asset){
-    const grid = document.getElementById('labelGrid');
-    grid.innerHTML = `<div class="label-tile"><svg id="lbl-svg-0"></svg><div class="lt-name">${escapeHtml(asset.name)}</div><div class="lt-code">${escapeHtml(asset.barcode)} · ${escapeHtml(asset.lokasi)}</div></div>`;
-    try{
-      if(typeof JsBarcode === 'undefined') throw new Error('lib not loaded');
-      JsBarcode('#lbl-svg-0', asset.barcode, { format:"CODE128", width:2, height:50, fontSize:11, margin:4 });
-    }catch(e){ toast('Gagal memuat library barcode, coba muat ulang halaman', true); return; }
-    setTimeout(()=> window.print(), 150);
-  }
-
-  // RENDER ASSET LIST
-  function renderAssets(){
-    const list = document.getElementById('assetList');
-    document.getElementById('assetCountPill').textContent = assets.length + ' aset';
-    document.getElementById('astCountPill').textContent = assets.length;
-    if(assets.length === 0){ list.innerHTML = emptyState('Belum ada aset terdaftar'); return; }
-    list.innerHTML = assets.map((a, idx) => {
-      const last = lastServiceFor(a.barcode);
-      const lastLabel = last ? (last.svcType + ' · ' + new Date(last.ts).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'})) : 'Belum pernah diservis';
-      return `
-      <div class="asset-card">
-        <div class="asset-head">
-          <div>
-            <div class="asset-name">${escapeHtml(a.name)}</div>
-            <div class="asset-sub">${escapeHtml(a.barcode)} · ${escapeHtml(a.jenis)}</div>
-          </div>
-          <div class="asset-icons">
-            ${isAdmin() ? `<button class="icon-btn" data-edit="${idx}" title="Ubah data aset">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
-            </button>` : ''}
-            <button class="icon-btn" data-print="${idx}" title="Cetak label barcode">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 9V3h12v6M6 18H4a1 1 0 01-1-1v-5a1 1 0 011-1h16a1 1 0 011 1v5a1 1 0 01-1 1h-2M6 14h12v7H6z"/></svg>
-            </button>
-            ${isAdmin() ? `<button class="icon-btn danger" data-del="${idx}" title="Hapus aset">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2m3 0l-1 14a1 1 0 01-1 1H7a1 1 0 01-1-1L5 6h14z"/></svg>
-            </button>` : ''}
-          </div>
-        </div>
-        <div class="asset-meta">
-          <span class="tag tag-loc">${escapeHtml(a.lokasi)}</span>
-          <span class="tag tag-last ${last?'':'none'}">${escapeHtml(lastLabel)}</span>
-        </div>
-      </div>`;
-    }).join('');
-    list.querySelectorAll('[data-print]').forEach(btn=> btn.addEventListener('click', ()=> openPrintModal(assets[parseInt(btn.dataset.print,10)])));
-    list.querySelectorAll('[data-edit]').forEach(btn=> btn.addEventListener('click', ()=> openEditAssetModal(assets[parseInt(btn.dataset.edit,10)])));
-    list.querySelectorAll('[data-del]').forEach(btn=> btn.addEventListener('click', ()=> openDeleteConfirm(assets[parseInt(btn.dataset.del,10)])));
-  }
-
-  function openDeleteConfirm(asset){
-    const svcCount = serviceEntries.filter(s => s.barcode === asset.barcode).length;
-    modalContent.innerHTML = `
-      <div class="modal-head">
-        <div class="modal-title">Hapus Aset Ini?</div>
-        <button class="modal-close" id="mClose">&times;</button>
-      </div>
-      <div class="item-barcode">${escapeHtml(asset.name)} · ${escapeHtml(asset.barcode)}</div>
-      <div class="stock-hint">${svcCount > 0 ? svcCount + ' riwayat servis aset ini akan ikut terhapus. ' : ''}Tindakan ini tidak bisa dibatalkan.</div>
-      <div class="modal-actions">
-        <button class="btn" id="dConfirm" style="background:var(--red);color:#2a0e0a;">Ya, Hapus Aset</button>
-        <button class="btn btn-outline" id="mCancel">Batal</button>
-      </div>
-    `;
-    overlay.classList.add('active');
-    document.getElementById('mClose').addEventListener('click', closeModal);
-    document.getElementById('mCancel').addEventListener('click', closeModal);
-    document.getElementById('dConfirm').addEventListener('click', async ()=>{
-      const error = await deleteAssetDb(asset.barcode);
-      if(error){ toast('Gagal menghapus: ' + error.message, true); return; }
-      assets = assets.filter(a => a.barcode !== asset.barcode);
-      serviceEntries = serviceEntries.filter(s => s.barcode !== asset.barcode);
-      renderAssets(); renderServiceList();
-      closeModal();
-      toast('Aset dihapus: ' + asset.name);
-    });
-  }
-
-  const FIXED_JENIS = ['AC', 'Kipas'];
-
-  function populateFilterOptions(){
-    const jenisSel = document.getElementById('filterJenis');
-    const assetSel = document.getElementById('filterAsset');
-    const dynamicJenis = [...new Set(assets.map(a => a.jenis))];
-    const extraJenis = dynamicJenis.filter(j => !FIXED_JENIS.some(f => f.toLowerCase() === j.toLowerCase()));
-    const jenisList = [...FIXED_JENIS, ...extraJenis];
-    const prevJenis = filterJenis, prevAsset = filterAsset;
-    jenisSel.innerHTML = '<option value="all">Semua Jenis</option>' + jenisList.map(j => `<option value="${escapeHtml(j)}">${escapeHtml(j)}</option>`).join('');
-    const assetPool = prevJenis === 'all' ? assets : assets.filter(a => a.jenis === prevJenis);
-    assetSel.innerHTML = '<option value="all">Semua Aset</option>' + assetPool.map(a => `<option value="${escapeHtml(a.barcode)}">${escapeHtml(a.name)} · ${escapeHtml(a.barcode)}</option>`).join('');
-    jenisSel.value = jenisList.includes(prevJenis) || prevJenis === 'all' ? prevJenis : 'all';
-    assetSel.value = assetPool.some(a => a.barcode === prevAsset) ? prevAsset : 'all';
-  }
-
-  document.getElementById('filterJenis').addEventListener('change', (e)=>{
-    filterJenis = e.target.value; filterAsset = 'all';
-    populateFilterOptions(); renderServiceList();
-  });
-  document.getElementById('filterAsset').addEventListener('change', (e)=>{
-    filterAsset = e.target.value; renderServiceList();
-  });
-  document.getElementById('filterStatus').addEventListener('change', (e)=>{
-    filterStatus = e.target.value; renderServiceList();
-  });
-
-  // SERVICE TAB
-  function renderServiceList(){
-    populateFilterOptions();
-    const list = document.getElementById('serviceList');
-    let sorted = serviceEntries.slice().sort((a,b)=> new Date(b.ts)-new Date(a.ts));
-    if(filterAsset !== 'all'){
-      sorted = sorted.filter(r => r.barcode === filterAsset);
-    } else if(filterJenis !== 'all'){
-      const barcodesOfJenis = new Set(assets.filter(a => a.jenis === filterJenis).map(a => a.barcode));
-      sorted = sorted.filter(r => barcodesOfJenis.has(r.barcode));
-    }
-    if(filterStatus !== 'all'){
-      sorted = sorted.filter(r => r.status === filterStatus);
-    }
-    document.getElementById('svcCountPill').textContent = sorted.length + (sorted.length !== serviceEntries.length ? ' / ' + serviceEntries.length : '');
-    if(sorted.length === 0){ list.innerHTML = emptyState(serviceEntries.length === 0 ? 'Belum ada riwayat servis / perawatan' : 'Tidak ada riwayat yang cocok dengan filter'); return; }
-    list.innerHTML = sorted.map(r => {
-      const asset = assets.find(a => a.barcode === r.barcode);
-      const d = new Date(r.ts);
-      const dateStr = d.toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' });
-      const isDone = r.status === 'Selesai';
-      return `
-      <div class="svc-ticket">
-        <div class="svc-strip"></div>
-        <div class="svc-top">
-          <span class="svc-type">${escapeHtml(r.svcType)}</span>
-          <span class="status-badge ${isDone?'selesai':'proses'}">${escapeHtml(r.status)}</span>
-          <div class="svc-item">${escapeHtml(r.itemName)}</div>
-          <div class="svc-loc">${escapeHtml(r.barcode)}${asset ? ' · ' + escapeHtml(asset.lokasi) : ''}</div>
-          <div class="svc-desc">${escapeHtml(r.description || 'Tidak ada catatan tambahan')}</div>
-        </div>
-        <div class="svc-perf">
-          <span>Oleh <b>${escapeHtml(r.technician)}</b></span>
-          <span>${dateStr}</span>
-        </div>
-      </div>`;
-    }).join('');
-  }
-
-  document.getElementById('btnAddServiceMain').addEventListener('click', ()=>{
-    if(assets.length === 0){ toast('Belum ada aset terdaftar', true); return; }
-    openItemPickerForService();
-  });
-
-  function openItemPickerForService(){
-    modalContent.innerHTML = `
-      <div class="modal-head">
-        <div class="modal-title">Pilih Aset</div>
-        <button class="modal-close" id="mClose">&times;</button>
-      </div>
-      <label>Aset</label>
-      <select id="pickItem">
-        ${assets.map((a,i)=>`<option value="${i}">${escapeHtml(a.name)} — ${escapeHtml(a.barcode)} (${escapeHtml(a.lokasi)})</option>`).join('')}
-      </select>
-      <div class="modal-actions">
-        <button class="btn btn-amber" id="pickNext">Lanjut</button>
-        <button class="btn btn-outline" id="mCancel">Batal</button>
-      </div>
-    `;
-    overlay.classList.add('active');
-    document.getElementById('mClose').addEventListener('click', closeModal);
-    document.getElementById('mCancel').addEventListener('click', closeModal);
-    document.getElementById('pickNext').addEventListener('click', ()=>{
-      const idx = parseInt(document.getElementById('pickItem').value, 10);
-      openServiceModal(assets[idx]);
-    });
-  }
-
-  function emptyState(msg){
-    return `<div class="empty">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 8h.01M16 8h.01M8 16h8"/></svg>
-      <p>${escapeHtml(msg)}</p>
-    </div>`;
-  }
-  function escapeHtml(str){
-    const d = document.createElement('div');
-    d.textContent = str == null ? '' : String(str);<!DOCTYPE html>
-<html lang="id">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AsetScan — Manajemen Aset & Riwayat Perawatan</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.12.1/JsBarcode.all.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<style>
   @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&family=Barlow:wght@400;500;600;700&display=swap');
 
   :root{
@@ -1045,6 +129,13 @@
   .tag-last.none{ background:#f2e6d9; color:#9a5a10; }
 
   .fab-add{ margin-top:6px; }
+
+  .pagination{ display:flex; align-items:center; justify-content:center; gap:14px; margin: 16px 0 10px; }
+  .pagination.hidden{ display:none; }
+  .page-btn{ font-family:var(--cond); font-weight:700; font-size:14.5px; padding:8px 16px; border-radius:9px; border:1.5px solid var(--line); background:var(--bg-soft); color:var(--card); cursor:pointer; transition: all .15s; }
+  .page-btn:hover:not(:disabled){ border-color: var(--brass); color: var(--brass); }
+  .page-btn:disabled{ opacity:.35; cursor:not-allowed; }
+  .page-label{ font-family:var(--mono); font-size:11.5px; color:var(--ink-dim); letter-spacing:0.5px; white-space:nowrap; }
 
   /* SERVICE TICKET */
   .svc-ticket{ background: var(--card); color: var(--ink); border-radius:var(--radius-md); padding:0; margin-bottom:12px; position:relative; overflow:hidden; box-shadow: 0 1px 0 rgba(0,0,0,0.08); }
@@ -1217,6 +308,7 @@
         </button>
       </div>
       <div id="assetList"></div>
+      <div class="pagination" id="assetPagination"></div>
       <button class="btn btn-outline fab-add" id="btnAddAsset">+ Daftarkan Aset Baru</button>
     </section>
 
@@ -1233,6 +325,7 @@
         </select>
       </div>
       <div id="serviceList"></div>
+      <div class="pagination" id="svcPagination"></div>
       <button class="btn btn-outline fab-add" id="btnAddServiceMain">+ Catat Servis Baru</button>
     </section>
   </main>
@@ -1291,6 +384,9 @@
   let filterAsset = 'all';
   let filterStatus = 'all';
   let filterAssetJenis = 'all';
+  const PAGE_SIZE = 20;
+  let assetPage = 1;
+  let svcPage = 1;
   let html5QrCode = null;
   let scanning = false;
 
@@ -1532,6 +628,7 @@
       const error = await insertServiceDb(newEntry);
       if(error){ toast('Gagal menyimpan: ' + error.message, true); submitBtn.disabled = false; return; }
       serviceEntries.unshift(newEntry);
+      svcPage = 1;
       renderServiceList(); renderAssets();
       toast('Riwayat servis tersimpan');
       closeModal();
@@ -1656,6 +753,7 @@
   document.getElementById('assetTypeFilter').querySelectorAll('.type-chip').forEach(chip=>{
     chip.addEventListener('click', ()=>{
       filterAssetJenis = chip.dataset.jenis;
+      assetPage = 1;
       document.getElementById('assetTypeFilter').querySelectorAll('.type-chip').forEach(c=> c.classList.remove('active'));
       chip.classList.add('active');
       renderAssets();
@@ -1698,6 +796,23 @@
     setTimeout(()=> window.print(), 150);
   }
 
+  function renderPagination(containerId, currentPage, totalItems, onChange){
+    const el = document.getElementById(containerId);
+    const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
+    if(totalItems <= PAGE_SIZE){ el.innerHTML = ''; el.classList.add('hidden'); return currentPage; }
+    if(currentPage > totalPages) currentPage = totalPages;
+    if(currentPage < 1) currentPage = 1;
+    el.classList.remove('hidden');
+    el.innerHTML = `
+      <button type="button" class="page-btn" id="${containerId}Prev" ${currentPage<=1?'disabled':''}>&larr; Sebelumnya</button>
+      <span class="page-label">Hal ${currentPage} / ${totalPages}</span>
+      <button type="button" class="page-btn" id="${containerId}Next" ${currentPage>=totalPages?'disabled':''}>Berikutnya &rarr;</button>
+    `;
+    document.getElementById(containerId+'Prev').addEventListener('click', ()=> onChange(currentPage-1));
+    document.getElementById(containerId+'Next').addEventListener('click', ()=> onChange(currentPage+1));
+    return currentPage;
+  }
+
   // RENDER ASSET LIST
   const ICON_AC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M12 2l-3 3M12 2l3 3M12 22l-3-3M12 22l3-3M2 12h20M2 12l3-3M2 12l3 3M22 12l-3-3M22 12l-3 3"/></svg>';
   const ICON_KIPAS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 12a3 3 0 100-6 6 6 0 016 6 3 3 0 10-6-6 6 6 0 01-6 6 3 3 0 106 6 6 6 0 01-6-6z"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/></svg>';
@@ -1709,10 +824,14 @@
     const filtered = filterAssetJenis === 'all' ? assets : assets.filter(a => a.jenis === filterAssetJenis);
     document.getElementById('astCountPill').textContent = filtered.length + (filtered.length !== assets.length ? ' / ' + assets.length : '');
 
-    if(assets.length === 0){ list.innerHTML = emptyState('Belum ada aset terdaftar'); return; }
-    if(filtered.length === 0){ list.innerHTML = emptyState('Tidak ada aset jenis ini'); return; }
+    if(assets.length === 0){ list.innerHTML = emptyState('Belum ada aset terdaftar'); document.getElementById('assetPagination').innerHTML=''; return; }
+    if(filtered.length === 0){ list.innerHTML = emptyState('Tidak ada aset jenis ini'); document.getElementById('assetPagination').innerHTML=''; return; }
 
-    list.innerHTML = filtered.map((a) => {
+    assetPage = renderPagination('assetPagination', assetPage, filtered.length, (p)=>{ assetPage = p; renderAssets(); });
+    const startIdx = (assetPage - 1) * PAGE_SIZE;
+    const pageItems = filtered.slice(startIdx, startIdx + PAGE_SIZE);
+
+    list.innerHTML = pageItems.map((a) => {
       const idx = assets.indexOf(a);
       const isAc = a.jenis === 'AC';
       const jenisClass = isAc ? 'jenis-ac' : 'jenis-kipas';
@@ -1796,14 +915,14 @@
   }
 
   document.getElementById('filterJenis').addEventListener('change', (e)=>{
-    filterJenis = e.target.value; filterAsset = 'all';
+    filterJenis = e.target.value; filterAsset = 'all'; svcPage = 1;
     populateFilterOptions(); renderServiceList();
   });
   document.getElementById('filterAsset').addEventListener('change', (e)=>{
-    filterAsset = e.target.value; renderServiceList();
+    filterAsset = e.target.value; svcPage = 1; renderServiceList();
   });
   document.getElementById('filterStatus').addEventListener('change', (e)=>{
-    filterStatus = e.target.value; renderServiceList();
+    filterStatus = e.target.value; svcPage = 1; renderServiceList();
   });
 
   // SERVICE TAB
@@ -1821,8 +940,13 @@
       sorted = sorted.filter(r => r.status === filterStatus);
     }
     document.getElementById('svcCountPill').textContent = sorted.length + (sorted.length !== serviceEntries.length ? ' / ' + serviceEntries.length : '');
-    if(sorted.length === 0){ list.innerHTML = emptyState(serviceEntries.length === 0 ? 'Belum ada riwayat servis / perawatan' : 'Tidak ada riwayat yang cocok dengan filter'); return; }
-    list.innerHTML = sorted.map(r => {
+    if(sorted.length === 0){ list.innerHTML = emptyState(serviceEntries.length === 0 ? 'Belum ada riwayat servis / perawatan' : 'Tidak ada riwayat yang cocok dengan filter'); document.getElementById('svcPagination').innerHTML=''; return; }
+
+    svcPage = renderPagination('svcPagination', svcPage, sorted.length, (p)=>{ svcPage = p; renderServiceList(); });
+    const startIdx = (svcPage - 1) * PAGE_SIZE;
+    const pageItems = sorted.slice(startIdx, startIdx + PAGE_SIZE);
+
+    list.innerHTML = pageItems.map(r => {
       const asset = assets.find(a => a.barcode === r.barcode);
       const d = new Date(r.ts);
       const dateStr = d.toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' });
@@ -1883,14 +1007,6 @@
   function escapeHtml(str){
     const d = document.createElement('div');
     d.textContent = str == null ? '' : String(str);
-    return d.innerHTML;
-  }
-
-  checkSession();
-})();
-</script>
-</body>
-</html>
     return d.innerHTML;
   }
 
