@@ -6,6 +6,7 @@
 <title>AsetScan — Manajemen Aset & Riwayat Perawatan</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.12.1/JsBarcode.all.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&family=Barlow:wght@400;500;600&display=swap');
 
@@ -251,8 +252,10 @@
 
 <script>
 (function(){
-  const K_AST = 'asetscan:assets';
-  const K_SVC = 'asetscan:service';
+  const SUPABASE_URL = 'https://jwfpkwwzbyjyccnksmsu.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp3ZnBrd3d6YnlqeWNjbmtzbXN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMwNTI1ODksImV4cCI6MjA5ODYyODU4OX0.4jMupGbGAwUEDplmCiThMyZqRe-hSca_zNPXzkszjoc';
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
   let assets = [];
   let serviceEntries = [];
   let filterJenis = 'all';
@@ -273,9 +276,9 @@
     { barcode:'KP-0004', name:'Kipas Exhaust', jenis:'Kipas', lokasi:'Dapur Kantin' },
   ];
   const seedService = [
-    { id:'seed1', barcode:'AC-0001', itemName:'AC Split 1PK', svcType:'Servis Rutin', technician:'Budi (Teknisi Internal)', description:'Cleaning unit indoor & outdoor, cek tekanan freon normal', status:'Selesai', ts:new Date(Date.now()-1000*60*60*24*30).toISOString() },
-    { id:'seed2', barcode:'AC-0003', itemName:'AC Cassette 3PK', svcType:'Perbaikan', technician:'CV Sejuk Abadi', description:'Ganti kapasitor kompresor, unit sempat mati total', status:'Selesai', ts:new Date(Date.now()-1000*60*60*24*10).toISOString() },
-    { id:'seed3', barcode:'KP-0001', itemName:'Kipas Angin Berdiri', svcType:'Cleaning Indoor', technician:'Budi (Teknisi Internal)', description:'Bersihkan baling-baling dan kisi-kisi dari debu', status:'Selesai', ts:new Date(Date.now()-1000*60*60*24*5).toISOString() },
+    { id:'seed1', barcode:'AC-0001', item_name:'AC Split 1PK', svc_type:'Servis Rutin', technician:'Budi (Teknisi Internal)', description:'Cleaning unit indoor & outdoor, cek tekanan freon normal', status:'Selesai', ts:new Date(Date.now()-1000*60*60*24*30).toISOString() },
+    { id:'seed2', barcode:'AC-0003', item_name:'AC Cassette 3PK', svc_type:'Perbaikan', technician:'CV Sejuk Abadi', description:'Ganti kapasitor kompresor, unit sempat mati total', status:'Selesai', ts:new Date(Date.now()-1000*60*60*24*10).toISOString() },
+    { id:'seed3', barcode:'KP-0001', item_name:'Kipas Angin Berdiri', svc_type:'Cleaning Indoor', technician:'Budi (Teknisi Internal)', description:'Bersihkan baling-baling dan kisi-kisi dari debu', status:'Selesai', ts:new Date(Date.now()-1000*60*60*24*5).toISOString() },
   ];
 
   function toast(msg, isErr){
@@ -285,26 +288,52 @@
     setTimeout(()=> t.classList.remove('show'), 2400);
   }
 
+  function mapAssetRow(r){ return { barcode:r.barcode, name:r.name, jenis:r.jenis, lokasi:r.lokasi }; }
+  function mapServiceRow(r){ return { id:r.id, barcode:r.barcode, itemName:r.item_name, svcType:r.svc_type, technician:r.technician, description:r.description, status:r.status, ts:r.ts }; }
+
   async function loadData(){
-    try{
-      const r = await window.storage.get(K_AST, true);
-      assets = r ? JSON.parse(r.value) : null;
-    }catch(e){ assets = null; }
-    if(!assets){ assets = seedAssets; await saveAssets(); }
-    try{
-      const r = await window.storage.get(K_SVC, true);
-      serviceEntries = r ? JSON.parse(r.value) : null;
-    }catch(e){ serviceEntries = null; }
-    if(!serviceEntries){ serviceEntries = seedService; await saveService(); }
+    let { data: astData, error: astErr } = await sb.from('assets').select('*').order('name', { ascending:true });
+    if(astErr){
+      toast('Gagal terhubung ke database: ' + astErr.message, true);
+      assets = []; serviceEntries = [];
+      renderAssets(); renderServiceList();
+      return;
+    }
+    if(astData.length === 0){
+      const { error: seedErr } = await sb.from('assets').insert(seedAssets);
+      if(!seedErr){
+        const { error: seedSvcErr } = await sb.from('service_entries').insert(seedService);
+        const reload = await sb.from('assets').select('*').order('name', { ascending:true });
+        astData = reload.data || seedAssets;
+      }
+    }
+    assets = astData.map(mapAssetRow);
+
+    const { data: svcData, error: svcErr } = await sb.from('service_entries').select('*').order('ts', { ascending:false });
+    if(svcErr){ toast('Gagal memuat riwayat servis: ' + svcErr.message, true); serviceEntries = []; }
+    else serviceEntries = svcData.map(mapServiceRow);
+
     renderAssets(); renderServiceList();
   }
-  async function saveAssets(){
-    try{ await window.storage.set(K_AST, JSON.stringify(assets), true); }
-    catch(e){ toast('Gagal menyimpan data aset', true); }
+
+  async function insertAssetDb(asset){
+    const { error } = await sb.from('assets').insert([{ barcode: asset.barcode, name: asset.name, jenis: asset.jenis, lokasi: asset.lokasi }]);
+    return error;
   }
-  async function saveService(){
-    try{ await window.storage.set(K_SVC, JSON.stringify(serviceEntries), true); }
-    catch(e){ toast('Gagal menyimpan riwayat servis', true); }
+  async function updateAssetDb(asset){
+    const { error } = await sb.from('assets').update({ name: asset.name, jenis: asset.jenis, lokasi: asset.lokasi }).eq('barcode', asset.barcode);
+    return error;
+  }
+  async function deleteAssetDb(barcode){
+    const { error } = await sb.from('assets').delete().eq('barcode', barcode);
+    return error;
+  }
+  async function insertServiceDb(entry){
+    const { error } = await sb.from('service_entries').insert([{
+      id: entry.id, barcode: entry.barcode, item_name: entry.itemName, svc_type: entry.svcType,
+      technician: entry.technician, description: entry.description, status: entry.status, ts: entry.ts
+    }]);
+    return error;
   }
 
   // TABS
@@ -367,7 +396,6 @@
     return list.slice().sort((a,b)=> new Date(b.ts) - new Date(a.ts))[0];
   }
 
-  // Scan result: full asset detail + full service history (no keluar/masuk transaction)
   function openAssetModal(asset){
     modalContent.innerHTML = `
       <div class="modal-head">
@@ -465,11 +493,15 @@
       const technician = document.getElementById('sTech').value.trim();
       const description = document.getElementById('sDesc').value.trim();
       if(!technician){ toast('Isi nama teknisi/vendor dulu', true); return; }
-      serviceEntries.unshift({
+      const submitBtn = document.getElementById('sSubmit');
+      submitBtn.disabled = true;
+      const newEntry = {
         id: Date.now().toString(36), barcode: asset.barcode, itemName: asset.name,
         svcType, technician, description, status: selectedStatus, ts: new Date(date).toISOString()
-      });
-      await saveService();
+      };
+      const error = await insertServiceDb(newEntry);
+      if(error){ toast('Gagal menyimpan: ' + error.message, true); submitBtn.disabled = false; return; }
+      serviceEntries.unshift(newEntry);
       renderServiceList(); renderAssets();
       toast('Riwayat servis tersimpan');
       closeModal();
@@ -498,10 +530,15 @@
     document.getElementById('mClose').addEventListener('click', closeModal);
     document.getElementById('mCancel').addEventListener('click', closeModal);
     document.getElementById('eSubmit').addEventListener('click', async ()=>{
-      asset.name = document.getElementById('eName').value.trim() || asset.name;
-      asset.jenis = document.getElementById('eJenis').value.trim() || asset.jenis;
-      asset.lokasi = document.getElementById('eLokasi').value.trim() || asset.lokasi;
-      await saveAssets();
+      const updated = {
+        barcode: asset.barcode,
+        name: document.getElementById('eName').value.trim() || asset.name,
+        jenis: document.getElementById('eJenis').value.trim() || asset.jenis,
+        lokasi: document.getElementById('eLokasi').value.trim() || asset.lokasi,
+      };
+      const error = await updateAssetDb(updated);
+      if(error){ toast('Gagal menyimpan: ' + error.message, true); return; }
+      asset.name = updated.name; asset.jenis = updated.jenis; asset.lokasi = updated.lokasi;
       renderAssets();
       toast('Data aset diperbarui');
       closeModal();
@@ -550,8 +587,9 @@
       if(!finalCode) finalCode = generateInternalCode();
       if(assets.some(a => a.barcode === finalCode)){ toast('Kode barcode sudah dipakai aset lain', true); return; }
       const newAsset = { barcode: finalCode, name, jenis, lokasi };
+      const error = await insertAssetDb(newAsset);
+      if(error){ toast('Gagal menyimpan: ' + error.message, true); return; }
       assets.push(newAsset);
-      await saveAssets();
       renderAssets();
       closeModal();
       toast('Aset baru terdaftar: ' + name);
@@ -656,9 +694,10 @@
     document.getElementById('mClose').addEventListener('click', closeModal);
     document.getElementById('mCancel').addEventListener('click', closeModal);
     document.getElementById('dConfirm').addEventListener('click', async ()=>{
+      const error = await deleteAssetDb(asset.barcode);
+      if(error){ toast('Gagal menghapus: ' + error.message, true); return; }
       assets = assets.filter(a => a.barcode !== asset.barcode);
       serviceEntries = serviceEntries.filter(s => s.barcode !== asset.barcode);
-      await saveAssets(); await saveService();
       renderAssets(); renderServiceList();
       closeModal();
       toast('Aset dihapus: ' + asset.name);
