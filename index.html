@@ -290,17 +290,32 @@
   const loginScreen = document.getElementById('loginScreen');
   const mainApp = document.getElementById('mainApp');
   const loginError = document.getElementById('loginError');
+  let currentUser = null; // { email, displayName, role }
 
   async function checkSession(){
     const { data: { session } } = await sb.auth.getSession();
     if(session){
+      const meta = session.user.user_metadata || {};
+      currentUser = {
+        email: session.user.email,
+        displayName: meta.display_name || session.user.email,
+        role: meta.role || 'teknisi'
+      };
       loginScreen.style.display = 'none';
       mainApp.style.display = 'flex';
+      applyRoleUI();
       loadData();
     } else {
+      currentUser = null;
       loginScreen.style.display = 'flex';
       mainApp.style.display = 'none';
     }
+  }
+
+  function isAdmin(){ return currentUser && currentUser.role === 'admin'; }
+
+  function applyRoleUI(){
+    document.getElementById('btnAddAsset').style.display = isAdmin() ? 'block' : 'none';
   }
 
   document.getElementById('btnLogin').addEventListener('click', doLogin);
@@ -449,7 +464,9 @@
   function onBarcodeDetected(code){
     if(scanning) stopScan();
     const asset = assets.find(a => a.barcode === code);
-    if(asset) openAssetModal(asset); else openNewAssetModal(code, true);
+    if(asset){ openAssetModal(asset); return; }
+    if(!isAdmin()){ toast('Aset belum terdaftar. Minta admin untuk mendaftarkannya.', true); return; }
+    openNewAssetModal(code, true);
   }
 
   // MODALS
@@ -482,13 +499,14 @@
 
       <div class="modal-actions">
         <button class="btn btn-amber" id="mAddService">+ Catat Servis / Perawatan</button>
-        <button class="btn btn-outline" id="mEditAsset">Ubah Jenis / Lokasi</button>
+        ${isAdmin() ? '<button class="btn btn-outline" id="mEditAsset">Ubah Jenis / Lokasi</button>' : ''}
       </div>
     `;
     overlay.classList.add('active');
     document.getElementById('mClose').addEventListener('click', closeModal);
     document.getElementById('mAddService').addEventListener('click', ()=> openServiceModal(asset));
-    document.getElementById('mEditAsset').addEventListener('click', ()=> openEditAssetModal(asset));
+    const editBtn = document.getElementById('mEditAsset');
+    if(editBtn) editBtn.addEventListener('click', ()=> openEditAssetModal(asset));
   }
 
   function renderMiniHistory(barcode){
@@ -527,8 +545,8 @@
       <label>Tanggal</label>
       <input type="date" id="sDate" value="${today}">
 
-      <label>Teknisi / Vendor</label>
-      <input type="text" id="sTech" placeholder="Nama teknisi atau vendor">
+      <label>Teknisi</label>
+      <input type="text" id="sTech" value="${escapeHtml(currentUser ? currentUser.displayName : '')}" readonly>
 
       <label>Deskripsi Pekerjaan</label>
       <textarea id="sDesc" placeholder="Contoh: cleaning outdoor, cek tekanan freon..."></textarea>
@@ -558,9 +576,8 @@
     document.getElementById('sSubmit').addEventListener('click', async ()=>{
       const svcType = document.getElementById('sType').value;
       const date = document.getElementById('sDate').value || today;
-      const technician = document.getElementById('sTech').value.trim();
+      const technician = currentUser ? currentUser.displayName : 'Tidak diketahui';
       const description = document.getElementById('sDesc').value.trim();
-      if(!technician){ toast('Isi nama teknisi/vendor dulu', true); return; }
       const submitBtn = document.getElementById('sSubmit');
       submitBtn.disabled = true;
       const newEntry = {
@@ -744,15 +761,15 @@
             <div class="asset-sub">${escapeHtml(a.barcode)} · ${escapeHtml(a.jenis)}</div>
           </div>
           <div class="asset-icons">
-            <button class="icon-btn" data-edit="${idx}" title="Ubah data aset">
+            ${isAdmin() ? `<button class="icon-btn" data-edit="${idx}" title="Ubah data aset">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
-            </button>
+            </button>` : ''}
             <button class="icon-btn" data-print="${idx}" title="Cetak label barcode">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 9V3h12v6M6 18H4a1 1 0 01-1-1v-5a1 1 0 011-1h16a1 1 0 011 1v5a1 1 0 01-1 1h-2M6 14h12v7H6z"/></svg>
             </button>
-            <button class="icon-btn danger" data-del="${idx}" title="Hapus aset">
+            ${isAdmin() ? `<button class="icon-btn danger" data-del="${idx}" title="Hapus aset">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2m3 0l-1 14a1 1 0 01-1 1H7a1 1 0 01-1-1L5 6h14z"/></svg>
-            </button>
+            </button>` : ''}
           </div>
         </div>
         <div class="asset-meta">
