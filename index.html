@@ -515,10 +515,13 @@
         <button class="modal-close" id="mClose">&times;</button>
       </div>
       <div class="item-barcode">${escapeHtml(asset.barcode)}</div>
+      <label>Jenis</label>
+      <div class="action-toggle" id="eJenisToggle">
+        <button type="button" data-jenis="AC" class="${asset.jenis === 'AC' ? 'selected' : ''}">AC</button>
+        <button type="button" data-jenis="Kipas" class="${asset.jenis !== 'AC' ? 'selected' : ''}">Kipas</button>
+      </div>
       <label>Nama Aset</label>
       <input type="text" id="eName" value="${escapeHtml(asset.name)}">
-      <label>Jenis</label>
-      <input type="text" id="eJenis" value="${escapeHtml(asset.jenis)}">
       <label>Lokasi</label>
       <input type="text" id="eLokasi" value="${escapeHtml(asset.lokasi)}">
       <div class="modal-actions">
@@ -529,11 +532,19 @@
     overlay.classList.add('active');
     document.getElementById('mClose').addEventListener('click', closeModal);
     document.getElementById('mCancel').addEventListener('click', closeModal);
+    let selectedJenis = asset.jenis === 'AC' ? 'AC' : 'Kipas';
+    document.getElementById('eJenisToggle').querySelectorAll('button').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        selectedJenis = btn.dataset.jenis;
+        modalContent.querySelectorAll('#eJenisToggle button').forEach(b=> b.classList.remove('selected'));
+        btn.classList.add('selected');
+      });
+    });
     document.getElementById('eSubmit').addEventListener('click', async ()=>{
       const updated = {
         barcode: asset.barcode,
         name: document.getElementById('eName').value.trim() || asset.name,
-        jenis: document.getElementById('eJenis').value.trim() || asset.jenis,
+        jenis: selectedJenis,
         lokasi: document.getElementById('eLokasi').value.trim() || asset.lokasi,
       };
       const error = await updateAssetDb(updated);
@@ -556,10 +567,13 @@
         <div class="modal-title">Aset Belum Terdaftar</div>
         <button class="modal-close" id="mClose">&times;</button>
       </div>
-      <label>Nama Aset</label>
-      <input type="text" id="nName" placeholder="Contoh: AC Split 1PK">
       <label>Jenis</label>
-      <input type="text" id="nJenis" placeholder="Contoh: AC Split / AC Cassette">
+      <div class="action-toggle" id="nJenisToggle">
+        <button type="button" class="selected" data-jenis="AC">AC</button>
+        <button type="button" data-jenis="Kipas">Kipas</button>
+      </div>
+      <label>Nama Aset</label>
+      <input type="text" id="nName" placeholder="Contoh: AC Split 1PK atau Kipas Angin Berdiri">
       <label>Lokasi</label>
       <input type="text" id="nLokasi" placeholder="Contoh: Ruang Server Lt.2">
       <label>Kode Barcode</label>
@@ -578,9 +592,17 @@
     document.getElementById('mCancel').addEventListener('click', closeModal);
     const genBtn = document.getElementById('nGenCode');
     if(genBtn) genBtn.addEventListener('click', ()=>{ document.getElementById('nCode').value = generateInternalCode(); });
+    let selectedJenis = 'AC';
+    document.getElementById('nJenisToggle').querySelectorAll('button').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        selectedJenis = btn.dataset.jenis;
+        modalContent.querySelectorAll('#nJenisToggle button').forEach(b=> b.classList.remove('selected'));
+        btn.classList.add('selected');
+      });
+    });
     document.getElementById('nSubmit').addEventListener('click', async ()=>{
       const name = document.getElementById('nName').value.trim();
-      const jenis = document.getElementById('nJenis').value.trim() || 'Umum';
+      const jenis = selectedJenis;
       const lokasi = document.getElementById('nLokasi').value.trim() || '-';
       let finalCode = document.getElementById('nCode').value.trim();
       if(!name){ toast('Isi nama aset dulu', true); return; }
